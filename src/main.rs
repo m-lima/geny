@@ -185,23 +185,31 @@ mod brain {
     use super::world::World;
 
     enum Input {
-        Direction,
+        Random,
+        DirectionVertical,
+        DirectionHorizontal,
     }
 
     impl Input {
         fn spike(&self, world: &World, index: usize) -> f32 {
             match self {
-                Self::Direction => match world.being(index).direction() {
-                    Direction::North => 0.0,
-                    Direction::East => 0.25,
-                    Direction::South => 0.5,
-                    Direction::West => 0.75,
+                Self::Random => rand::random(),
+                Self::DirectionVertical => match world.being(index).direction() {
+                    Direction::East | Direction::West => 0.0,
+                    Direction::North => 1.0,
+                    Direction::South => -1.0,
+                },
+                Self::DirectionHorizontal => match world.being(index).direction() {
+                    Direction::North | Direction::South => 0.0,
+                    Direction::East => 1.0,
+                    Direction::West => -1.0,
                 },
             }
         }
     }
 
     enum Output {
+        Noop,
         TurnLeft,
         TurnRight,
         Advance,
@@ -210,6 +218,7 @@ mod brain {
     impl Output {
         fn spike(&self, world: &mut World, index: usize) {
             match self {
+                Self::Noop => {}
                 Self::TurnLeft => world.being_mut(index).turn_left(),
                 Self::TurnRight => world.being_mut(index).turn_right(),
                 Self::Advance => {
