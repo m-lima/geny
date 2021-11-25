@@ -92,15 +92,6 @@ mod world {
             self.coordinates[index]
         }
 
-        // pub fn step(&mut self) {
-        //     let all_info = 0;
-        //     self.grid
-        //         .iter()
-        //         .take(self.size * self.size)
-        //         .filter_map(Option::as_ref)
-        //         .for_each(|being| being.step(all_info));
-        // }
-
         pub fn advance(&mut self, being: usize, direction: Direction) {
             let coord = self.coordinates[being];
 
@@ -325,24 +316,17 @@ mod being {
 }
 
 fn main() -> anyhow::Result<()> {
-    use std::io::Write;
+    let mut args = std::env::args().skip(1);
 
-    let mut stdout = std::io::stdout();
-    let stdin = std::io::stdin();
+    let size = args
+        .next()
+        .ok_or(anyhow::anyhow!("No size provided"))?
+        .parse()?;
 
-    stdout.write_all(b"Select grid size: ")?;
-    stdout.flush()?;
-
-    let mut buffer = String::new();
-    stdin.read_line(&mut buffer)?;
-    let size = buffer.trim().parse()?;
-
-    stdout.write_all(b"Select being count: ")?;
-    stdout.flush()?;
-
-    let mut buffer = String::new();
-    stdin.read_line(&mut buffer)?;
-    let count = buffer.trim().parse()?;
+    let count = args
+        .next()
+        .ok_or(anyhow::anyhow!("No count provided"))?
+        .parse()?;
 
     let grid = world::World::new(size, count);
 
