@@ -12,9 +12,9 @@ mod renderer {
 
         impl Renderer for Terminal {
             fn render(&self, world: &World) {
-                for row in world.iter_rows() {
-                    for cell in row {
-                        if let Some(being) = cell {
+                for y in 0..world.size() {
+                    for x in 0..world.size() {
+                        if let Some(being) = world.cell((x, y)) {
                             let mut color = being.as_u24();
                             let b = color & 0xff;
                             color >>= 8;
@@ -28,6 +28,7 @@ mod renderer {
                     }
                     println!();
                 }
+                println!();
             }
         }
     }
@@ -37,113 +38,280 @@ mod renderer {
 
 mod world {
     use super::being::Being;
+    use super::grid::{Coordinate, Direction};
 
     pub struct World {
-        size: usize,
-        grid: [Option<Being>; 256 * 256],
+        size: u8,
+        beings: Vec<Being>,
+        coordinates: Vec<Coordinate>,
     }
 
     impl World {
         #[inline]
-        pub fn new(size: u8) -> Self {
+        pub fn new(size: u8, count: u16) -> Self {
+            use rand::seq::IteratorRandom;
+
+            // TODO: This assert is kinda ugly
+            assert!(count < u16::from(size) * u16::from(size));
+
+            let beings = (0..count).map(|_| Being::new()).collect();
+            let coordinates = (0..size)
+                .flat_map(|x| (0..size).map(|y| Coordinate::new(x, y)).collect::<Vec<_>>())
+                .choose_multiple(&mut rand::thread_rng(), count as usize);
+
             Self {
-                size: size as usize,
-                grid: [0; 256 * 256].map(|_| None),
+                size,
+                beings,
+                coordinates,
             }
         }
 
         #[inline]
-        pub const fn size(&self) -> usize {
+        pub const fn size(&self) -> u8 {
             self.size
         }
 
-        pub fn iter_rows(&self) -> impl Iterator<Item = iter::Row<'_>> {
-            (0..self.size).map(|row| iter::Row::new(self, row))
-        }
-
-        pub fn step(&mut self) {
-            let all_info = 0;
-            self.grid
+        pub fn cell(&self, target: impl Into<Coordinate>) -> Option<&Being> {
+            let target = target.into();
+            self.coordinates
                 .iter()
-                .take(self.size * self.size)
-                .filter_map(Option::as_ref)
-                .for_each(|being| being.step(all_info));
+                .enumerate()
+                .find(|(_, c)| **c == target)
+                .map(|(i, _)| &self.beings[i])
         }
 
-        // TODO: Should this be part of the builder?
-        pub fn randomize(&mut self, count: usize) {
-            use rand::seq::SliceRandom;
-
-            // TODO: This assert is kinda ugly
-            assert!(count < self.size * self.size);
-
-            self.grid
-                .iter_mut()
-                .take(count)
-                .for_each(|cell| *cell = Some(Being));
-            self.grid[..self.size * self.size].shuffle(&mut rand::thread_rng());
-        }
-    }
-
-    mod iter {
-        use super::{Being, World};
-
-        pub struct Row<'a> {
-            first: usize,
-            current: usize,
-            world: &'a World,
+        pub fn being(&self, index: usize) -> &Being {
+            &self.beings[index]
         }
 
-        impl<'a> Row<'a> {
-            pub fn new(world: &'a World, row: usize) -> Self {
-                Self {
-                    first: row * world.size,
-                    current: 0,
-                    world,
-                }
-            }
+        pub fn being_mut(&mut self, index: usize) -> &mut Being {
+            &mut self.beings[index]
         }
 
-        impl<'a> Iterator for Row<'a> {
-            type Item = &'a Option<Being>;
+        pub fn coordinate(&self, index: usize) -> Coordinate {
+            self.coordinates[index]
+        }
 
-            fn next(&mut self) -> Option<Self::Item> {
-                if self.current < self.world.size {
-                    // SAFETY: Already check for bounds
-                    let next = unsafe { self.world.grid.get_unchecked(self.first + self.current) };
-                    self.current += 1;
-                    Some(next)
-                } else {
-                    None
-                }
+        // pub fn step(&mut self) {
+        //     let all_info = 0;
+        //     self.grid
+        //         .iter()
+        //         .take(self.size * self.size)
+        //         .filter_map(Option::as_ref)
+        //         .for_each(|being| being.step(all_info));
+        // }
+
+        pub fn advance(&mut self, being: usize, direction: Direction) {
+            let coord = self.coordinates[being];
+
+            let dest = match direction {
+                Direction::North if coord.y() > 0 => coord.neighbor(Direction::North),
+                Direction::North => return,
+                Direction::East if coord.x() < self.size - 1 => coord.neighbor(Direction::East),
+                Direction::East => return,
+                Direction::South if coord.y() < self.size - 1 => coord.neighbor(Direction::South),
+                Direction::South => return,
+                Direction::West if coord.x() > 0 => coord.neighbor(Direction::West),
+                Direction::West => return,
+            };
+
+            if self.cell(dest).is_none() {
+                self.coordinates[being] = dest;
             }
         }
     }
 }
 
-mod brain {
-    enum Input {
-        Age,
+mod grid {
+    #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    pub enum Direction {
+        North = 0,
+        East,
+        South,
+        West,
     }
+
+    impl Direction {
+        pub fn from(value: u8) -> Self {
+            match value & 0b11 {
+                3 => Self::West,
+                2 => Self::South,
+                1 => Self::East,
+                _ => Self::North,
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+    pub struct Coordinate(u16);
+
+    impl Coordinate {
+        pub fn new(x: u8, y: u8) -> Self {
+            Self(u16::from(x) | (u16::from(y) << 8))
+        }
+
+        // ALLOWED: There is a bit mask already limiting the result
+        #[allow(clippy::cast_possible_truncation)]
+        pub fn x(self) -> u8 {
+            (self.0 & 0xff) as u8
+        }
+
+        // ALLOWED: There is a bit mask already limiting the result
+        #[allow(clippy::cast_possible_truncation)]
+        pub fn y(self) -> u8 {
+            (self.0 >> 8 & 0xff) as u8
+        }
+
+        pub fn neighbor(self, direction: Direction) -> Self {
+            match direction {
+                Direction::North => Self(self.0 - 0x100),
+                Direction::East => Self(self.0 + 1),
+                Direction::South => Self(self.0 + 0x100),
+                Direction::West => Self(self.0 - 1),
+            }
+        }
+    }
+
+    impl From<(u8, u8)> for Coordinate {
+        fn from((x, y): (u8, u8)) -> Self {
+            Self::new(x, y)
+        }
+    }
+}
+
+mod brain {
+    use super::being::Being;
+    use super::grid::Direction;
+    use super::world::World;
+
+    enum Input {
+        Direction,
+    }
+
+    impl Input {
+        fn spike(&self, world: &World, index: usize) -> f32 {
+            match self {
+                Self::Direction => match world.being(index).direction() {
+                    Direction::North => 0.0,
+                    Direction::East => 0.25,
+                    Direction::South => 0.5,
+                    Direction::West => 0.75,
+                },
+            }
+        }
+    }
+
     enum Output {
-        MoveUp,
-        MoveRight,
-        MoveDown,
-        MoveLeft,
+        TurnLeft,
+        TurnRight,
+        Advance,
+    }
+
+    impl Output {
+        fn spike(&self, world: &mut World, index: usize) {
+            match self {
+                Self::TurnLeft => world.being_mut(index).turn_left(),
+                Self::TurnRight => world.being_mut(index).turn_right(),
+                Self::Advance => {
+                    let direction = world.being(index).direction();
+                    world.advance(index, direction);
+                }
+            }
+        }
+    }
+
+    enum Axon {
+        Input(Input),
+    }
+
+    enum Dentrite {
+        Output(Output),
+    }
+
+    struct Synapsis<'a> {
+        axon: &'a Axon,
+        dentrite: &'a Dentrite,
     }
 
     struct Brain {}
 }
 
 mod being {
-    pub struct Being;
+    use super::grid::Direction;
+
+    pub struct Being {
+        direction: Direction,
+    }
 
     impl Being {
+        pub fn new() -> Self {
+            Self {
+                direction: Direction::from(rand::random()),
+            }
+        }
+
+        pub fn turn_right(&mut self) {
+            self.direction = Direction::from(self.direction as u8 + 1);
+        }
+
+        pub fn turn_left(&mut self) {
+            self.direction = Direction::from((self.direction as u8).wrapping_sub(1));
+        }
+
         pub fn as_u24(&self) -> u32 {
             rand::random()
         }
 
+        #[inline]
+        pub fn direction(&self) -> Direction {
+            self.direction
+        }
+
         pub fn step(&self, _all_info_needed: usize) {}
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::{Being, Direction};
+
+        #[test]
+        fn turn() {
+            fn turn_right(being: &mut Being) {
+                let direction = being.direction();
+                being.turn_right();
+                match direction {
+                    Direction::North => assert_eq!(being.direction(), Direction::East),
+                    Direction::East => assert_eq!(being.direction(), Direction::South),
+                    Direction::South => assert_eq!(being.direction(), Direction::West),
+                    Direction::West => assert_eq!(being.direction(), Direction::North),
+                }
+            }
+
+            fn turn_left(being: &mut Being) {
+                let direction = being.direction();
+                being.turn_left();
+                match direction {
+                    Direction::North => assert_eq!(being.direction(), Direction::West),
+                    Direction::West => assert_eq!(being.direction(), Direction::South),
+                    Direction::South => assert_eq!(being.direction(), Direction::East),
+                    Direction::East => assert_eq!(being.direction(), Direction::North),
+                }
+            }
+
+            let mut being = Being {
+                direction: Direction::from(0),
+            };
+
+            for i in 0..8 {
+                println!("{}", i);
+                turn_right(&mut being);
+            }
+
+            for i in 0..16 {
+                println!("{}", i);
+                turn_left(&mut being);
+            }
+        }
     }
 }
 
@@ -158,10 +326,16 @@ fn main() -> anyhow::Result<()> {
 
     let mut buffer = String::new();
     stdin.read_line(&mut buffer)?;
-    let size = buffer.trim().parse::<u8>()?;
+    let size = buffer.trim().parse()?;
 
-    let mut grid = world::World::new(size);
-    grid.randomize(8);
+    stdout.write_all(b"Select being count: ")?;
+    stdout.flush()?;
+
+    let mut buffer = String::new();
+    stdin.read_line(&mut buffer)?;
+    let count = buffer.trim().parse()?;
+
+    let grid = world::World::new(size, count);
 
     renderer::Renderer::render(&renderer::Terminal, &grid);
 
