@@ -7,21 +7,35 @@ mod renderer {
 
     // TODO: Put behind feature for 256 color term
     mod terminal {
+        use super::super::being::Being;
         use super::{Renderer, World};
         pub struct Terminal;
 
         impl Renderer for Terminal {
             fn render(&self, world: &World) {
-                for y in 0..world.size() {
-                    for x in 0..world.size() {
-                        if let Some(being) = world.cell((x, y)) {
+                let mut buffer = vec![
+                    vec![Option::<&Being>::None; world.size() as usize];
+                    world.size() as usize
+                ];
+
+                for (being, coord) in world
+                    .coordinates()
+                    .enumerate()
+                    .map(|(i, c)| (world.being(i), c))
+                {
+                    buffer[coord.y() as usize][coord.x() as usize] = Some(being);
+                }
+
+                for row in buffer {
+                    for cell in row {
+                        if let Some(being) = cell {
                             let mut color = being.as_u24();
                             let b = color & 0xff;
                             color >>= 8;
                             let g = color & 0xff;
                             color >>= 8;
                             let r = color & 0xff;
-                            print!("[38;2;{};{};{}m\u{2588}\u{2588}[m", r, g, b);
+                            print!("[38;2;{:03};{:03};{:03}m\u{2588}\u{2588}[m", r, g, b);
                         } else {
                             print!("  ");
                         }
@@ -67,17 +81,13 @@ mod world {
         }
 
         #[inline]
-        pub const fn size(&self) -> u8 {
+        pub fn size(&self) -> u8 {
             self.size
         }
 
-        pub fn cell(&self, target: impl Into<Coordinate>) -> Option<&Being> {
-            let target = target.into();
-            self.coordinates
-                .iter()
-                .enumerate()
-                .find(|(_, c)| **c == target)
-                .map(|(i, _)| &self.beings[i])
+        #[inline]
+        pub fn count(&self) -> usize {
+            self.beings.len()
         }
 
         pub fn being(&self, index: usize) -> &Being {
@@ -90,6 +100,10 @@ mod world {
 
         pub fn coordinate(&self, index: usize) -> Coordinate {
             self.coordinates[index]
+        }
+
+        pub fn coordinates(&self) -> impl Iterator<Item = &Coordinate> {
+            self.coordinates.iter()
         }
 
         pub fn advance(&mut self, being: usize, direction: Direction) {
@@ -106,7 +120,7 @@ mod world {
                 Direction::West => return,
             };
 
-            if self.cell(dest).is_none() {
+            if !self.coordinates.iter().enumerate().any(|(_, c)| *c == dest) {
                 self.coordinates[being] = dest;
             }
         }
