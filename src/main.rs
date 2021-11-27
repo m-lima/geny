@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
 
     renderer::Renderer::render(&renderer::Terminal, &world);
 
-    let mut brain = neural::Brain::<State<'_>, Input, Output, 3, 0, 4>::new(
+    let mut brain = neural::Brain::<Input, Output, 3, 0, 4>::new(
         [
             Input::Random,
             Input::DirectionVertical,
@@ -37,12 +37,13 @@ fn main() -> anyhow::Result<()> {
         ],
     );
 
+    brain.connect(0, 0, 0, 3, 1.0);
+
     for index in 0..world.count() {
-        let mut state = State {
-            world: &mut world,
-            index,
-        };
-        brain.step(&mut state);
+        let outputs = brain.step(|input| input.retrieve(&world, index));
+        for output in outputs {
+            output.update(&mut world, index);
+        }
     }
 
     renderer::Renderer::render(&renderer::Terminal, &world);
@@ -62,16 +63,16 @@ enum Input {
     DirectionHorizontal,
 }
 
-impl neural::Input<State<'_>> for Input {
-    fn update(&self, state: &State<'_>) -> neural::Signal {
+impl Input {
+    fn retrieve(&self, world: &world::World, index: usize) -> neural::Signal {
         match self {
             Self::Random => neural::Signal::cap(rand::random::<f32>()),
-            Self::DirectionVertical => match state.world.being(state.index).direction() {
+            Self::DirectionVertical => match world.being(index).direction() {
                 geo::Direction::East | geo::Direction::West => neural::Signal::cap(0.5),
                 geo::Direction::North => neural::Signal::cap(1.0),
                 geo::Direction::South => neural::Signal::cap(0.0),
             },
-            Self::DirectionHorizontal => match state.world.being(state.index).direction() {
+            Self::DirectionHorizontal => match world.being(index).direction() {
                 geo::Direction::North | geo::Direction::South => neural::Signal::cap(0.5),
                 geo::Direction::East => neural::Signal::cap(1.0),
                 geo::Direction::West => neural::Signal::cap(0.0),
@@ -88,15 +89,15 @@ enum Output {
     Advance,
 }
 
-impl neural::Output<State<'_>> for Output {
-    fn update(&self, state: &mut State<'_>) {
+impl Output {
+    fn update(&self, world: &mut world::World, index: usize) {
         match self {
             Self::Noop => {}
-            Self::TurnLeft => state.world.being_mut(state.index).turn_left(),
-            Self::TurnRight => state.world.being_mut(state.index).turn_right(),
+            Self::TurnLeft => world.being_mut(index).turn_left(),
+            Self::TurnRight => world.being_mut(index).turn_right(),
             Self::Advance => {
-                let direction = state.world.being(state.index).direction();
-                state.world.advance(state.index, direction);
+                let direction = world.being(index).direction();
+                world.advance(index, direction);
             }
         }
     }

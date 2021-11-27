@@ -19,44 +19,32 @@ struct Dentrite {
     synapse: Amplifier,
 }
 
-pub trait Input<State> {
-    fn update(&self, state: &State) -> Signal;
-}
-
-struct InputNeuron<State, In: Input<State>> {
-    input: In,
+struct InputNeuron<Input> {
+    input: Input,
     latch: Signal,
     visited: bool,
-    _marker: std::marker::PhantomData<State>,
 }
 
-impl<State, In: Input<State>> InputNeuron<State, In> {
-    fn new(input: In) -> Self {
+impl<Input> InputNeuron<Input> {
+    fn new(input: Input) -> Self {
         Self {
             input,
             latch: Signal::new(),
             visited: false,
-            _marker: std::marker::PhantomData,
         }
     }
 }
 
-pub trait Output<State> {
-    fn update(&self, state: &mut State);
-}
-
-struct OutputNeuron<State, Out: Output<State>> {
-    output: Out,
+struct OutputNeuron<Output> {
+    output: Output,
     dentrites: Vec<Dentrite>,
-    _marker: std::marker::PhantomData<State>,
 }
 
-impl<State, Out: Output<State>> OutputNeuron<State, Out> {
-    fn new(output: Out) -> Self {
+impl<Output> OutputNeuron<Output> {
+    fn new(output: Output) -> Self {
         Self {
             output,
             dentrites: vec![],
-            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -77,29 +65,21 @@ impl InternalNeuron {
     }
 }
 
-pub struct Brain<
-    State,
-    In: Input<State>,
-    Out: Output<State>,
-    const INPUTS: usize,
-    const INTERNALS: usize,
-    const OUTPUTS: usize,
-> {
-    inputs: [InputNeuron<State, In>; INPUTS],
+pub struct Brain<Input, Output, const INPUTS: usize, const INTERNALS: usize, const OUTPUTS: usize> {
+    inputs: [InputNeuron<Input>; INPUTS],
     internals: [InternalNeuron; INTERNALS],
-    outputs: [OutputNeuron<State, Out>; OUTPUTS],
+    outputs: [OutputNeuron<Output>; OUTPUTS],
 }
 
 impl<
-        State,
-        In: Input<State>,
-        Out: Output<State>,
+        Input: Copy,
+        Output: Copy,
         const INPUTS: usize,
         const INTERNALS: usize,
         const OUTPUTS: usize,
-    > Brain<State, In, Out, INPUTS, INTERNALS, OUTPUTS>
+    > Brain<Input, Output, INPUTS, INTERNALS, OUTPUTS>
 {
-    pub fn new(inputs: [In; INPUTS], outputs: [Out; OUTPUTS]) -> Self {
+    pub fn new(inputs: [Input; INPUTS], outputs: [Output; OUTPUTS]) -> Self {
         Self {
             inputs: inputs.map(InputNeuron::new),
             internals: [0; INTERNALS].map(|_| InternalNeuron::new()),
@@ -107,13 +87,13 @@ impl<
         }
     }
 
-    fn update(&mut self, pointer: Pointer, state: &State) -> Signal {
+    fn update(&mut self, pointer: Pointer, input: impl Copy + Fn(Input) -> Signal) -> Signal {
         match pointer.layer {
             Layer::Input => {
                 let neuron = &mut self.inputs[pointer.neuron];
                 if !neuron.visited {
                     neuron.visited = true;
-                    neuron.latch = neuron.input.update(state);
+                    neuron.latch = input(neuron.input);
                 }
                 neuron.latch
             }
@@ -127,7 +107,7 @@ impl<
                             (*neuron)
                                 .dentrites
                                 .iter()
-                                .map(|d| d.synapse * self.update(d.axon, state)),
+                                .map(|d| d.synapse * self.update(d.axon, input)),
                         );
                     }
                     (*neuron).latch
@@ -137,24 +117,45 @@ impl<
         }
     }
 
-    pub fn step(&mut self, state: &mut State) {
+    pub fn step(&mut self, input: impl Copy + Fn(Input) -> Signal) -> Vec<Output> {
         self.inputs.iter_mut().for_each(|i| i.visited = false);
         self.internals.iter_mut().for_each(|i| i.visited = false);
 
+        let mut output = vec![];
+
         for i in 0..self.outputs.len() {
-            let neuron: *const OutputNeuron<State, Out> = &self.outputs[i];
+            let neuron: *const OutputNeuron<Output> = &self.outputs[i];
             unsafe {
                 let probability = <Tangential as Aggregator>::aggregate(
                     (*neuron)
                         .dentrites
                         .iter()
-                        .map(|d| d.synapse * self.update(d.axon, state)),
+                        .map(|d| d.synapse * self.update(d.axon, input)),
                 );
                 if rand::random::<f32>() < probability.as_f32() {
-                    (*neuron).output.update(state);
+                    output.push((*neuron).output);
                 }
             }
         }
+
+        output
+    }
+
+    pub fn connect(
+        &mut self,
+        inLayer: usize,
+        inIndex: usize,
+        outLayer: usize,
+        outIndex: usize,
+        strength: f32,
+    ) {
+        self.outputs[outIndex].dentrites.push(Dentrite {
+            axon: Pointer {
+                layer: Layer::Input,
+                neuron: inIndex,
+            },
+            synapse: Amplifier::new(strength),
+        });
     }
 }
 
@@ -179,6 +180,12 @@ mod signal {
     // TODO: When creating new dentrites, this value should be capped
     #[derive(Copy, Clone, PartialOrd, PartialEq, Debug)]
     pub struct Amplifier(f32);
+
+    impl Amplifier {
+        pub fn new(value: f32) -> Self {
+            Self(value)
+        }
+    }
 
     impl std::ops::Mul<Signal> for Amplifier {
         type Output = Signal;
