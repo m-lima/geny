@@ -23,26 +23,18 @@ fn main() -> anyhow::Result<()> {
 
     renderer::Renderer::render(&renderer::Terminal, &world);
 
-    let mut brain = neural::Brain::<Input, Output, 3, 0, 4>::new(
-        [
-            Input::Random,
-            Input::DirectionVertical,
-            Input::DirectionHorizontal,
-        ],
-        [
-            Output::Noop,
-            Output::TurnLeft,
-            Output::TurnRight,
-            Output::Advance,
-        ],
-    );
+    let mut brain = neural::Brain::<3, 0, 4>::new();
 
-    brain.connect(0, 0, 0, 3, 1.0);
+    // brain.connect(0, 0, 0, 3, 1.0);
 
     for index in 0..world.count() {
-        let outputs = brain.step(|input| input.retrieve(&world, index));
-        for output in outputs {
-            output.update(&mut world, index);
+        let outputs = brain.step(|input| Input::from(input).sense(&world, index));
+        for (output, signal) in outputs
+            .iter()
+            .enumerate()
+            .map(|(i, signal)| (Output::from(i), signal))
+        {
+            output.act(&mut world, index);
         }
     }
 
@@ -58,13 +50,17 @@ struct State<'a> {
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
 enum Input {
-    Random,
+    Random = 0,
     DirectionVertical,
     DirectionHorizontal,
 }
 
 impl Input {
-    fn retrieve(&self, world: &world::World, index: usize) -> neural::Signal {
+    fn from(index: usize) -> Self {
+        unsafe { std::mem::transmute::<u8, Self>(index as u8) }
+    }
+
+    fn sense(self, world: &world::World, index: usize) -> neural::Signal {
         match self {
             Self::Random => neural::Signal::cap(rand::random::<f32>()),
             Self::DirectionVertical => match world.being(index).direction() {
@@ -83,14 +79,18 @@ impl Input {
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
 enum Output {
-    Noop,
+    Noop = 0,
     TurnLeft,
     TurnRight,
     Advance,
 }
 
 impl Output {
-    fn update(&self, world: &mut world::World, index: usize) {
+    fn from(index: usize) -> Self {
+        unsafe { std::mem::transmute::<u8, Self>(index as u8) }
+    }
+
+    fn act(self, world: &mut world::World, index: usize) {
         match self {
             Self::Noop => {}
             Self::TurnLeft => world.being_mut(index).turn_left(),

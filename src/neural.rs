@@ -9,53 +9,47 @@ enum Layer {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-struct Pointer {
+struct NeuronRef {
     layer: Layer,
-    neuron: usize,
+    index: usize,
 }
 
 struct Dentrite {
-    axon: Pointer,
+    axon: NeuronRef,
     synapse: Amplifier,
 }
 
-struct InputNeuron<Input> {
-    input: Input,
+struct Input {
     latch: Signal,
     visited: bool,
 }
 
-impl<Input> InputNeuron<Input> {
-    fn new(input: Input) -> Self {
+impl Input {
+    fn new() -> Self {
         Self {
-            input,
             latch: Signal::new(),
             visited: false,
         }
     }
 }
 
-struct OutputNeuron<Output> {
-    output: Output,
+struct Output {
     dentrites: Vec<Dentrite>,
 }
 
-impl<Output> OutputNeuron<Output> {
-    fn new(output: Output) -> Self {
-        Self {
-            output,
-            dentrites: vec![],
-        }
+impl Output {
+    fn new() -> Self {
+        Self { dentrites: vec![] }
     }
 }
 
-struct InternalNeuron {
+struct Internal {
     dentrites: Vec<Dentrite>,
     latch: Signal,
     visited: bool,
 }
 
-impl InternalNeuron {
+impl Internal {
     fn new() -> Self {
         Self {
             dentrites: vec![],
@@ -65,97 +59,69 @@ impl InternalNeuron {
     }
 }
 
-pub struct Brain<Input, Output, const INPUTS: usize, const INTERNALS: usize, const OUTPUTS: usize> {
-    inputs: [InputNeuron<Input>; INPUTS],
-    internals: [InternalNeuron; INTERNALS],
-    outputs: [OutputNeuron<Output>; OUTPUTS],
+pub struct Brain<const INPUTS: usize, const INTERNALS: usize, const OUTPUTS: usize> {
+    inputs: [Input; INPUTS],
+    internals: [Internal; INTERNALS],
+    outputs: [Output; OUTPUTS],
 }
 
-impl<
-        Input: Copy,
-        Output: Copy,
-        const INPUTS: usize,
-        const INTERNALS: usize,
-        const OUTPUTS: usize,
-    > Brain<Input, Output, INPUTS, INTERNALS, OUTPUTS>
+impl<const INPUTS: usize, const INTERNALS: usize, const OUTPUTS: usize>
+    Brain<INPUTS, INTERNALS, OUTPUTS>
 {
-    pub fn new(inputs: [Input; INPUTS], outputs: [Output; OUTPUTS]) -> Self {
+    pub fn new() -> Self {
         Self {
-            inputs: inputs.map(InputNeuron::new),
-            internals: [0; INTERNALS].map(|_| InternalNeuron::new()),
-            outputs: outputs.map(OutputNeuron::new),
+            inputs: [0; INPUTS].map(|_| Input::new()),
+            internals: [0; INTERNALS].map(|_| Internal::new()),
+            outputs: [0; OUTPUTS].map(|_| Output::new()),
         }
     }
 
-    fn update(&mut self, pointer: Pointer, input: impl Copy + Fn(Input) -> Signal) -> Signal {
-        match pointer.layer {
+    pub fn step(&mut self, input: impl Copy + Fn(usize) -> Signal) -> [Signal; OUTPUTS] {
+        self.inputs.iter_mut().for_each(|i| i.visited = false);
+        self.internals.iter_mut().for_each(|i| i.visited = false);
+
+        let mut output = [Signal::new(); OUTPUTS];
+
+        for (i, o) in self.outputs.iter().enumerate() {
+            output[i] = <Tangential as Aggregator>::aggregate(o.dentrites.iter().map(|d| {
+                d.synapse * Self::update(&mut self.inputs, &mut self.internals, d.axon, input)
+            }));
+        }
+
+        output
+    }
+
+    fn update(
+        inputs: &mut [Input; INPUTS],
+        internals: &mut [Internal; INTERNALS],
+        neuron_ref: NeuronRef,
+        input: impl Copy + Fn(usize) -> Signal,
+    ) -> Signal {
+        match neuron_ref.layer {
             Layer::Input => {
-                let neuron = &mut self.inputs[pointer.neuron];
+                let neuron = &mut inputs[neuron_ref.index];
                 if !neuron.visited {
                     neuron.visited = true;
-                    neuron.latch = input(neuron.input);
+                    neuron.latch = input(neuron_ref.index);
                 }
                 neuron.latch
             }
             Layer::Internal => {
-                let neuron: *mut InternalNeuron = &mut self.internals[pointer.neuron];
-                // TODO: Avoid this unsafe. Maybe reloading the index at each access
+                let neuron: *mut Internal = &mut internals[neuron_ref.index];
+                // SAFETY: Safe because we never modify the list nor do we revisit a node
                 unsafe {
                     if !(*neuron).visited {
                         (*neuron).visited = true;
-                        (*neuron).latch = <Tangential as Aggregator>::aggregate(
-                            (*neuron)
-                                .dentrites
-                                .iter()
-                                .map(|d| d.synapse * self.update(d.axon, input)),
-                        );
+                        (*neuron).latch =
+                            <Tangential as Aggregator>::aggregate((*neuron).dentrites.iter().map(
+                                |d| d.synapse * Self::update(inputs, internals, d.axon, input),
+                            ));
                     }
                     (*neuron).latch
                 }
             }
             Layer::Output => unreachable!("Output layer can never be a source of signal"),
         }
-    }
-
-    pub fn step(&mut self, input: impl Copy + Fn(Input) -> Signal) -> Vec<Output> {
-        self.inputs.iter_mut().for_each(|i| i.visited = false);
-        self.internals.iter_mut().for_each(|i| i.visited = false);
-
-        let mut output = vec![];
-
-        for i in 0..self.outputs.len() {
-            let neuron: *const OutputNeuron<Output> = &self.outputs[i];
-            unsafe {
-                let probability = <Tangential as Aggregator>::aggregate(
-                    (*neuron)
-                        .dentrites
-                        .iter()
-                        .map(|d| d.synapse * self.update(d.axon, input)),
-                );
-                if rand::random::<f32>() < probability.as_f32() {
-                    output.push((*neuron).output);
-                }
-            }
-        }
-
-        output
-    }
-
-    pub fn connect(
-        &mut self,
-        inLayer: usize,
-        inIndex: usize,
-        outLayer: usize,
-        outIndex: usize,
-        strength: f32,
-    ) {
-        self.outputs[outIndex].dentrites.push(Dentrite {
-            axon: Pointer {
-                layer: Layer::Input,
-                neuron: inIndex,
-            },
-            synapse: Amplifier::new(strength),
-        });
     }
 }
 
