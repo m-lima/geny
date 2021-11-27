@@ -1,4 +1,5 @@
-use signal::{Aggregator, Amplifier, Signal};
+pub use signal::Signal;
+use signal::{Aggregator, Amplifier, Tangential};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum Layer {
@@ -13,12 +14,12 @@ struct Pointer {
     neuron: usize,
 }
 
-struct Dentrite<const A: u8> {
+struct Dentrite {
     axon: Pointer,
-    synapse: Amplifier<A>,
+    synapse: Amplifier,
 }
 
-trait Input<State> {
+pub trait Input<State> {
     fn update(&self, state: &State) -> Signal;
 }
 
@@ -40,75 +41,69 @@ impl<State, In: Input<State>> InputNeuron<State, In> {
     }
 }
 
-trait Output<State> {
+pub trait Output<State> {
     fn update(&self, state: &mut State);
 }
 
-struct OutputNeuron<State, Out: Output<State>, const A: u8> {
+struct OutputNeuron<State, Out: Output<State>> {
     output: Out,
-    dentrites: Vec<Dentrite<A>>,
-    aggregator: Aggregator,
+    dentrites: Vec<Dentrite>,
     _marker: std::marker::PhantomData<State>,
 }
 
-impl<State, Out: Output<State>, const A: u8> OutputNeuron<State, Out, A> {
-    fn new(output: Out, aggregator: Aggregator) -> Self {
+impl<State, Out: Output<State>> OutputNeuron<State, Out> {
+    fn new(output: Out) -> Self {
         Self {
             output,
             dentrites: vec![],
-            aggregator,
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-struct InternalNeuron<const A: u8> {
-    dentrites: Vec<Dentrite<A>>,
-    aggregator: Aggregator,
+struct InternalNeuron {
+    dentrites: Vec<Dentrite>,
     latch: Signal,
     visited: bool,
 }
 
-impl<const A: u8> InternalNeuron<A> {
-    fn new(aggregator: Aggregator) -> Self {
+impl InternalNeuron {
+    fn new() -> Self {
         Self {
             dentrites: vec![],
-            aggregator,
             latch: Signal::new(),
             visited: false,
         }
     }
 }
 
-struct Brain<
+pub struct Brain<
     State,
     In: Input<State>,
     Out: Output<State>,
-    const A: u8,
     const INPUTS: usize,
     const INTERNALS: usize,
     const OUTPUTS: usize,
 > {
     inputs: [InputNeuron<State, In>; INPUTS],
-    internals: [InternalNeuron<A>; INTERNALS],
-    outputs: [OutputNeuron<State, Out, A>; OUTPUTS],
+    internals: [InternalNeuron; INTERNALS],
+    outputs: [OutputNeuron<State, Out>; OUTPUTS],
 }
 
 impl<
         State,
         In: Input<State>,
         Out: Output<State>,
-        const A: u8,
         const INPUTS: usize,
         const INTERNALS: usize,
         const OUTPUTS: usize,
-    > Brain<State, In, Out, A, INPUTS, INTERNALS, OUTPUTS>
+    > Brain<State, In, Out, INPUTS, INTERNALS, OUTPUTS>
 {
     pub fn new(inputs: [In; INPUTS], outputs: [Out; OUTPUTS]) -> Self {
         Self {
             inputs: inputs.map(InputNeuron::new),
-            internals: [0; INTERNALS].map(|_| InternalNeuron::new(Aggregator::Tangential)),
-            outputs: outputs.map(|output| OutputNeuron::new(output, Aggregator::Tangential)),
+            internals: [0; INTERNALS].map(|_| InternalNeuron::new()),
+            outputs: outputs.map(OutputNeuron::new),
         }
     }
 
@@ -123,11 +118,12 @@ impl<
                 neuron.latch
             }
             Layer::Internal => {
-                let neuron: *mut InternalNeuron<A> = &mut self.internals[pointer.neuron];
+                let neuron: *mut InternalNeuron = &mut self.internals[pointer.neuron];
+                // TODO: Avoid this unsafe. Maybe reloading the index at each access
                 unsafe {
                     if !(*neuron).visited {
                         (*neuron).visited = true;
-                        (*neuron).latch = (*neuron).aggregator.aggregate(
+                        (*neuron).latch = <Tangential as Aggregator>::aggregate(
                             (*neuron)
                                 .dentrites
                                 .iter()
@@ -146,9 +142,9 @@ impl<
         self.internals.iter_mut().for_each(|i| i.visited = false);
 
         for i in 0..self.outputs.len() {
-            let neuron: *const OutputNeuron<State, Out, A> = &self.outputs[i];
+            let neuron: *const OutputNeuron<State, Out> = &self.outputs[i];
             unsafe {
-                let probability = (*neuron).aggregator.aggregate(
+                let probability = <Tangential as Aggregator>::aggregate(
                     (*neuron)
                         .dentrites
                         .iter()
@@ -180,37 +176,39 @@ mod signal {
         }
     }
 
+    // TODO: When creating new dentrites, this value should be capped
     #[derive(Copy, Clone, PartialOrd, PartialEq, Debug)]
-    pub struct Amplifier<const AMPLITUDE: u8>(f32);
+    pub struct Amplifier(f32);
 
-    impl<const AMPLITUDE: u8> std::ops::Mul<Signal> for Amplifier<AMPLITUDE> {
+    impl std::ops::Mul<Signal> for Amplifier {
         type Output = Signal;
 
         fn mul(self, rhs: Signal) -> Self::Output {
-            Signal::cap(rhs.as_f32() * f32::from(AMPLITUDE))
+            Signal::cap(rhs.as_f32() * self.0)
         }
     }
 
-    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-    pub enum Aggregator {
-        Linear,
-        Tangential,
+    pub trait Aggregator {
+        fn aggregate(inputs: impl Iterator<Item = Signal>) -> Signal;
     }
 
-    impl Aggregator {
-        pub fn aggregate(self, inputs: impl Iterator<Item = Signal>) -> Signal {
-            match self {
-                Self::Linear => {
-                    let sum = inputs
-                        .enumerate()
-                        .fold((0, 0.0), |a, c| (c.0, a.1 + c.1.as_f32()));
-                    // ALLOWED: Because there cannot be that many synapses (not enough neurons to
-                    // saturate 23 bits)
-                    #[allow(clippy::cast_precision_loss)]
-                    Signal::cap(sum.1 / sum.0 as f32)
-                }
-                Self::Tangential => Signal::cap(inputs.fold(0.0, |a, c| a + c.as_f32()).tanh()),
-            }
+    pub struct Linear;
+    impl Aggregator for Linear {
+        fn aggregate(inputs: impl Iterator<Item = Signal>) -> Signal {
+            let sum = inputs
+                .enumerate()
+                .fold((0, 0.0), |a, c| (c.0, a.1 + c.1.as_f32()));
+            // ALLOWED: Because there cannot be that many synapses (not enough neurons to
+            // saturate 23 bits)
+            #[allow(clippy::cast_precision_loss)]
+            Signal::cap(sum.1 / sum.0 as f32)
+        }
+    }
+
+    pub struct Tangential;
+    impl Aggregator for Tangential {
+        fn aggregate(inputs: impl Iterator<Item = Signal>) -> Signal {
+            Signal::cap(inputs.fold(0.0, |a, c| a + c.as_f32()).tanh())
         }
     }
 }

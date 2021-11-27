@@ -19,58 +19,85 @@ fn main() -> anyhow::Result<()> {
         .ok_or(anyhow::anyhow!("No count provided"))?
         .parse()?;
 
-    let grid = world::World::new(size, count);
+    let mut world = world::World::new(size, count);
 
-    renderer::Renderer::render(&renderer::Terminal, &grid);
+    renderer::Renderer::render(&renderer::Terminal, &world);
+
+    let mut brain = neural::Brain::<State<'_>, Input, Output, 3, 0, 4>::new(
+        [
+            Input::Random,
+            Input::DirectionVertical,
+            Input::DirectionHorizontal,
+        ],
+        [
+            Output::Noop,
+            Output::TurnLeft,
+            Output::TurnRight,
+            Output::Advance,
+        ],
+    );
+
+    for index in 0..world.count() {
+        let mut state = State {
+            world: &mut world,
+            index,
+        };
+        brain.step(&mut state);
+    }
+
+    renderer::Renderer::render(&renderer::Terminal, &world);
 
     Ok(())
 }
 
-// #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
-// enum Input {
-//     Random,
-//     DirectionVertical,
-//     DirectionHorizontal,
-// }
+struct State<'a> {
+    world: &'a mut world::World,
+    index: usize,
+}
 
-// impl Input {
-//     fn spike(&self, world: &World, index: usize) -> signal::Half {
-//         use signal::Signal;
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
+enum Input {
+    Random,
+    DirectionVertical,
+    DirectionHorizontal,
+}
 
-//         match self {
-//             Self::Random => signal::Half::cap(rand::random::<f32>()),
-//             Self::DirectionVertical => match world.being(index).direction() {
-//                 Direction::East | Direction::West => signal::Half::cap(0.5),
-//                 Direction::North => signal::Half::cap(1.0),
-//                 Direction::South => signal::Half::cap(0.0),
-//             },
-//             Self::DirectionHorizontal => match world.being(index).direction() {
-//                 Direction::North | Direction::South => signal::Half::cap(0.5),
-//                 Direction::East => signal::Half::cap(1.0),
-//                 Direction::West => signal::Half::cap(0.0),
-//             },
-//         }
-//     }
-// }
+impl neural::Input<State<'_>> for Input {
+    fn update(&self, state: &State<'_>) -> neural::Signal {
+        match self {
+            Self::Random => neural::Signal::cap(rand::random::<f32>()),
+            Self::DirectionVertical => match state.world.being(state.index).direction() {
+                geo::Direction::East | geo::Direction::West => neural::Signal::cap(0.5),
+                geo::Direction::North => neural::Signal::cap(1.0),
+                geo::Direction::South => neural::Signal::cap(0.0),
+            },
+            Self::DirectionHorizontal => match state.world.being(state.index).direction() {
+                geo::Direction::North | geo::Direction::South => neural::Signal::cap(0.5),
+                geo::Direction::East => neural::Signal::cap(1.0),
+                geo::Direction::West => neural::Signal::cap(0.0),
+            },
+        }
+    }
+}
 
-// #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
-// enum Output {
-//     Noop,
-//     TurnLeft,
-//     TurnRight,
-//     Advance,
-// }
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
+enum Output {
+    Noop,
+    TurnLeft,
+    TurnRight,
+    Advance,
+}
 
-// impl Output {
-//     fn spike(&self, world: &mut World, index: usize) {
-//         match self {
-//             Self::Noop => {}
-//             Self::TurnLeft => world.being_mut(index).turn_left(),
-//             Self::TurnRight => world.being_mut(index).turn_right(),
-//             Self::Advance => {
-//                 let direction = world.being(index).direction();
-//                 world.advance(index, direction);
-//             }
-//         }
-//     }
-// }
+impl neural::Output<State<'_>> for Output {
+    fn update(&self, state: &mut State<'_>) {
+        match self {
+            Self::Noop => {}
+            Self::TurnLeft => state.world.being_mut(state.index).turn_left(),
+            Self::TurnRight => state.world.being_mut(state.index).turn_right(),
+            Self::Advance => {
+                let direction = state.world.being(state.index).direction();
+                state.world.advance(state.index, direction);
+            }
+        }
+    }
+}
