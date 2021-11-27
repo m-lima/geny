@@ -22,11 +22,22 @@ trait Input<State> {
     fn update(&self, state: &State) -> Signal;
 }
 
-struct InputNeuron<State, In: Input<State>, const A: u8> {
+struct InputNeuron<State, In: Input<State>> {
     input: In,
     latch: Signal,
     visited: bool,
     _marker: std::marker::PhantomData<State>,
+}
+
+impl<State, In: Input<State>> InputNeuron<State, In> {
+    fn new(input: In) -> Self {
+        Self {
+            input,
+            latch: Signal::new(),
+            visited: false,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
 trait Output<State> {
@@ -34,10 +45,21 @@ trait Output<State> {
 }
 
 struct OutputNeuron<State, Out: Output<State>, const A: u8> {
-    out: Out,
+    output: Out,
     dentrites: Vec<Dentrite<A>>,
     aggregator: Aggregator,
     _marker: std::marker::PhantomData<State>,
+}
+
+impl<State, Out: Output<State>, const A: u8> OutputNeuron<State, Out, A> {
+    fn new(output: Out, aggregator: Aggregator) -> Self {
+        Self {
+            output,
+            dentrites: vec![],
+            aggregator,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
 struct InternalNeuron<const A: u8> {
@@ -47,13 +69,49 @@ struct InternalNeuron<const A: u8> {
     visited: bool,
 }
 
-struct Brain<State, In: Input<State>, Out: Output<State>, const A: u8> {
-    inputs: Vec<InputNeuron<State, In, A>>,
-    internals: Vec<InternalNeuron<A>>,
-    outputs: Vec<OutputNeuron<State, Out, A>>,
+impl<const A: u8> InternalNeuron<A> {
+    fn new(aggregator: Aggregator) -> Self {
+        Self {
+            dentrites: vec![],
+            aggregator,
+            latch: Signal::new(),
+            visited: false,
+        }
+    }
 }
 
-impl<State, In: Input<State>, Out: Output<State>, const A: u8> Brain<State, In, Out, A> {
+struct Brain<
+    State,
+    In: Input<State>,
+    Out: Output<State>,
+    const A: u8,
+    const INPUTS: usize,
+    const INTERNALS: usize,
+    const OUTPUTS: usize,
+> {
+    inputs: [InputNeuron<State, In>; INPUTS],
+    internals: [InternalNeuron<A>; INTERNALS],
+    outputs: [OutputNeuron<State, Out, A>; OUTPUTS],
+}
+
+impl<
+        State,
+        In: Input<State>,
+        Out: Output<State>,
+        const A: u8,
+        const INPUTS: usize,
+        const INTERNALS: usize,
+        const OUTPUTS: usize,
+    > Brain<State, In, Out, A, INPUTS, INTERNALS, OUTPUTS>
+{
+    pub fn new(inputs: [In; INPUTS], outputs: [Out; OUTPUTS]) -> Self {
+        Self {
+            inputs: inputs.map(InputNeuron::new),
+            internals: [0; INTERNALS].map(|_| InternalNeuron::new(Aggregator::Tangential)),
+            outputs: outputs.map(|output| OutputNeuron::new(output, Aggregator::Tangential)),
+        }
+    }
+
     fn update(&mut self, pointer: Pointer, state: &State) -> Signal {
         match pointer.layer {
             Layer::Input => {
@@ -84,6 +142,9 @@ impl<State, In: Input<State>, Out: Output<State>, const A: u8> Brain<State, In, 
     }
 
     pub fn step(&mut self, state: &mut State) {
+        self.inputs.iter_mut().for_each(|i| i.visited = false);
+        self.internals.iter_mut().for_each(|i| i.visited = false);
+
         for i in 0..self.outputs.len() {
             let neuron: *const OutputNeuron<State, Out, A> = &self.outputs[i];
             unsafe {
@@ -94,7 +155,7 @@ impl<State, In: Input<State>, Out: Output<State>, const A: u8> Brain<State, In, 
                         .map(|d| d.synapse * self.update(d.axon, state)),
                 );
                 if rand::random::<f32>() < probability.as_f32() {
-                    (*neuron).out.update(state);
+                    (*neuron).output.update(state);
                 }
             }
         }
@@ -106,7 +167,11 @@ mod signal {
     pub struct Signal(f32);
 
     impl Signal {
-        fn cap(value: f32) -> Self {
+        pub fn new() -> Self {
+            Self(0.0)
+        }
+
+        pub fn cap(value: f32) -> Self {
             Self(value.min(1.0).max(-1.0))
         }
 
