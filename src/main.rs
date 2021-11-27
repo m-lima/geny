@@ -23,13 +23,19 @@ fn main() -> anyhow::Result<()> {
 
     renderer::Renderer::render(&renderer::Terminal, &world);
 
-    let mut brain = neural::Brain::<3, 0, 4>::new();
+    let mut brain = neural::Brain::<3, 0, 4>::new::<4>(vec![neural::Gene::new(
+        true,
+        true,
+        Input::Random as usize,
+        Output::Advance as usize,
+        neural::Signal::cap(1.0),
+    )]);
 
     // brain.connect(0, 0, 0, 3, 1.0);
 
     for index in 0..world.count() {
         let outputs = brain.step(|input| Input::from(input).sense(&world, index));
-        for (output, signal) in outputs
+        for (output, _) in outputs
             .iter()
             .enumerate()
             .map(|(i, signal)| (Output::from(i), signal))
@@ -57,7 +63,12 @@ enum Input {
 
 impl Input {
     fn from(index: usize) -> Self {
-        unsafe { std::mem::transmute::<u8, Self>(index as u8) }
+        // ALLOWED: This should come already clamped from the neural net
+        // SAFTEY: This should come already clamped from the neural net
+        #[allow(clippy::cast_possible_truncation)]
+        unsafe {
+            std::mem::transmute::<u8, Self>(index as u8)
+        }
     }
 
     fn sense(self, world: &world::World, index: usize) -> neural::Signal {
@@ -87,7 +98,12 @@ enum Output {
 
 impl Output {
     fn from(index: usize) -> Self {
-        unsafe { std::mem::transmute::<u8, Self>(index as u8) }
+        // ALLOWED: This should come already clamped from the neural net
+        // SAFTEY: This should come already clamped from the neural net
+        #[allow(clippy::cast_possible_truncation)]
+        unsafe {
+            std::mem::transmute::<u8, Self>(index as u8)
+        }
     }
 
     fn act(self, world: &mut world::World, index: usize) {
