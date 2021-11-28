@@ -3,69 +3,45 @@
 // TODO: Start with a "be at" for exclusion. Later add food. Later add reproduction without
 // generations. Later add preying
 
-mod being;
 mod geo;
 mod neural;
 mod renderer;
 mod sim;
 
 fn main() -> anyhow::Result<()> {
-    // let mut args = std::env::args().skip(1);
+    let mut args = std::env::args().skip(1);
 
-    // let size = args
-    //     .next()
-    //     .ok_or(anyhow::anyhow!("No size provided"))?
-    //     .parse()?;
+    let size = args
+        .next()
+        .ok_or(anyhow::anyhow!("No size provided"))?
+        .parse()?;
 
-    // let count = args
-    //     .next()
-    //     .ok_or(anyhow::anyhow!("No count provided"))?
-    //     .parse()?;
+    let beings = args
+        .next()
+        .ok_or(anyhow::anyhow!("No being count provided"))?
+        .parse()?;
 
-    // let mut world = world::World::new(size, count);
+    let synapses = args
+        .next()
+        .ok_or(anyhow::anyhow!("No synapse count provided"))?
+        .parse()?;
 
-    // renderer::Renderer::render(&renderer::Terminal::<true>, &world);
+    let hidden_neurons = args
+        .next()
+        .ok_or(anyhow::anyhow!("No hidden neuron count provided"))?
+        .parse()?;
 
-    // let mut brain = neural::Brain::<3, 0, 4>::new::<4>(vec![
-    //     neural::Gene::new(
-    //         true,
-    //         true,
-    //         Input::Random as usize,
-    //         Output::Advance as usize,
-    //         neural::Signal::cap(1.0),
-    //     ),
-    //     neural::Gene::new(
-    //         true,
-    //         true,
-    //         Input::DirectionHorizontal as usize,
-    //         Output::TurnLeft as usize,
-    //         neural::Signal::cap(1.0),
-    //     ),
-    //     neural::Gene::new(
-    //         true,
-    //         true,
-    //         Input::DirectionVertical as usize,
-    //         Output::TurnLeft as usize,
-    //         neural::Signal::cap(0.5),
-    //     ),
-    // ]);
+    let mut simulation = sim::Simulation::new(size, beings, synapses, hidden_neurons);
 
-    // for _ in 0..10 {
-    //     for index in 0..world.count() {
-    //         let outputs = brain.step(|input| Input::from(input).sense(&world, index));
-    //         for (output, signal) in outputs
-    //             .iter()
-    //             .enumerate()
-    //             .map(|(i, signal)| (Output::from(i), signal))
-    //         {
-    //             if rand::random::<f32>() < signal.as_f32() {
-    //                 output.act(&mut world, index);
-    //             }
-    //         }
-    //     }
+    renderer::Renderer::render(&renderer::Terminal::<true>, &simulation);
 
-    //     renderer::Renderer::render(&renderer::Terminal::<true>, &world);
-    // }
+    for i in 0..1024_u16 {
+        println!("c");
+        simulation.step();
+        renderer::Renderer::render(&renderer::Terminal::<true>, &simulation);
+        println!("{:.1}%", f32::from(i) / 10.24);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 
     Ok(())
 }

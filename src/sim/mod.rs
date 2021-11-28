@@ -1,16 +1,54 @@
+mod being;
 mod gene;
 mod world;
 
-use super::being::Being;
+pub use being::Being;
 pub use gene::{Genome, Input, Output};
 pub use world::World;
 
-pub struct Simulation<const H: u8, const S: usize> {
+const HIDDEN_NEURONS: u8 = 8;
+
+pub struct Simulation {
     world: World,
-    beings: Vec<Being<H, S>>,
+    beings: Vec<Being>,
+    genomes: Vec<Genome>,
 }
 
-impl<const H: u8, const S: usize> Simulation<H, S> {
+impl Simulation {
+    pub fn new(size: u8, beings: u16, synapses: u16, hidden_neurons: u8) -> Self {
+        let genomes = (0..beings)
+            .map(|_| Genome::random(synapses))
+            .collect::<Vec<_>>();
+        Self {
+            world: World::new(size, beings),
+            beings: genomes
+                .iter()
+                .map(|g| g.to_brain(hidden_neurons))
+                .map(Being::new)
+                .collect(),
+            genomes,
+        }
+    }
+
+    pub fn step(&mut self) {
+        // TODO: Randomize order
+        // TODO: Make a Cow of the modifiable values
+        for index in self.indices() {
+            let being: *mut Being = self.being_mut(index);
+            // SAFETY: `being` never gets dropped or moved
+            let outputs = unsafe { (*being).brain() }.stimuli(|input| input.sense(self, index));
+            for output in outputs.iter().filter_map(|o| {
+                if rand::random::<f32>() < o.1.as_f32() {
+                    Some(o.0)
+                } else {
+                    None
+                }
+            }) {
+                output.act(self, index);
+            }
+        }
+    }
+
     #[inline]
     pub fn world(&self) -> &World {
         &self.world
@@ -22,12 +60,17 @@ impl<const H: u8, const S: usize> Simulation<H, S> {
     }
 
     #[inline]
-    pub fn being(&self, index: Index) -> &Being<H, S> {
+    pub fn being(&self, index: Index) -> &Being {
         unsafe { self.beings.get_unchecked(index.0) }
     }
 
     #[inline]
-    fn being_mut(&mut self, index: Index) -> &mut Being<H, S> {
+    pub fn genome(&self, index: Index) -> &Genome {
+        unsafe { self.genomes.get_unchecked(index.0) }
+    }
+
+    #[inline]
+    fn being_mut(&mut self, index: Index) -> &mut Being {
         unsafe { self.beings.get_unchecked_mut(index.0) }
     }
 }

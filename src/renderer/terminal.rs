@@ -1,13 +1,13 @@
-use super::super::being::Being;
 use super::super::geo::Direction;
 use super::super::sim::Simulation;
 use super::Renderer;
+
 pub struct Terminal<const BORDER: bool>;
 
 impl<const BORDER: bool> Renderer for Terminal<BORDER> {
     // ALLOWED: Makes it easier to read
     #[allow(clippy::non_ascii_literal)]
-    fn render<const H: u8, const S: usize>(&self, simulation: &Simulation<H, S>) {
+    fn render(&self, simulation: &Simulation) {
         let world = simulation.world();
 
         if BORDER {
@@ -18,12 +18,18 @@ impl<const BORDER: bool> Renderer for Terminal<BORDER> {
             println!("┓");
         }
         let mut buffer =
-            vec![vec![Option::<&Being<H, S>>::None; world.size() as usize]; world.size() as usize];
+            vec![vec![Option::<(char, u32)>::None; world.size() as usize]; world.size() as usize];
 
         for index in simulation.indices() {
             let coord = world.being(index);
-            let being = simulation.being(index);
-            buffer[coord.y() as usize][coord.x() as usize] = Some(being);
+            let direction = match simulation.being(index).direction() {
+                Direction::North => '↑',
+                Direction::East => '→',
+                Direction::South => '↓',
+                Direction::West => '←',
+            };
+            let id = simulation.genome(index).id();
+            buffer[coord.y() as usize][coord.x() as usize] = Some((direction, id));
         }
 
         for row in buffer {
@@ -31,19 +37,12 @@ impl<const BORDER: bool> Renderer for Terminal<BORDER> {
                 print!("│");
             }
             for cell in row {
-                if let Some(being) = cell {
-                    let mut color = being.as_u24();
-                    let b = color & 0xff;
-                    color >>= 8;
-                    let g = color & 0xff;
-                    color >>= 8;
-                    let r = color & 0xff;
-                    let direction = match being.direction() {
-                        Direction::North => "↑",
-                        Direction::East => "→",
-                        Direction::South => "↓",
-                        Direction::West => "←",
-                    };
+                if let Some((direction, mut id)) = cell {
+                    let b = id & 0xff;
+                    id >>= 8;
+                    let g = id & 0xff;
+                    id >>= 8;
+                    let r = id & 0xff;
                     print!(
                         "[48;2;{};{};{}m[38;2;{};{};{}m{}[38;2;{};{};{}m\u{2588}[m",
                         r,

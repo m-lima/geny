@@ -13,7 +13,7 @@ pub struct World {
 
 impl World {
     #[inline]
-    pub fn new(size: u8, count: u16) -> Self {
+    pub(super) fn new(size: u8, count: u16) -> Self {
         use rand::seq::IteratorRandom;
 
         let count = count.min(u16::from(size) * u16::from(size));
@@ -30,6 +30,7 @@ impl World {
         self.size
     }
 
+    #[inline]
     pub fn being(&self, index: Index) -> Coordinate {
         unsafe { *self.beings.get_unchecked(index.0) }
     }

@@ -1,55 +1,39 @@
-use super::geo::Direction;
-use super::neural::Brain;
-use super::sim::{Genome, Input, Output};
+use super::super::geo::Direction;
+use super::super::neural::Brain;
+use super::{Input, Output};
 
-// TODO: Remove this type param
-pub struct Being<const H: u8, const S: usize> {
+pub struct Being {
     direction: Direction,
     // huger
     // resilience
     // strength
-    brain: Brain<Input, Output>,
-    genome: Genome<H, S>,
+    brain: Brain<Input, Output, { super::HIDDEN_NEURONS }>,
 }
 
-impl<const H: u8, const S: usize> Being<H, S> {
-    pub fn new() -> Self {
-        // TODO: This
-        unimplemented!()
-        // let brain = Brain::new(genome.iter().map(Gene::to_axon));
-        // Self {
-        //     direction: Direction::from(rand::random()),
-        //     brain,
-        //     genome,
-        // }
+impl Being {
+    pub(super) fn new(brain: Brain<Input, Output, { super::HIDDEN_NEURONS }>) -> Self {
+        Self {
+            direction: Direction::from(rand::random()),
+            brain,
+        }
     }
 
-    pub fn turn_right(&mut self) {
+    pub(super) fn brain(&mut self) -> &mut Brain<Input, Output, { super::HIDDEN_NEURONS }> {
+        &mut self.brain
+    }
+
+    pub(super) fn turn_right(&mut self) {
         self.direction = Direction::from(self.direction as u8 + 1);
     }
 
-    pub fn turn_left(&mut self) {
+    pub(super) fn turn_left(&mut self) {
         self.direction = Direction::from((self.direction as u8).wrapping_sub(1));
-    }
-
-    pub fn as_u24(&self) -> u32 {
-        rand::random()
-        // use std::hash::{Hash, Hasher};
-
-        // let mut state = std::collections::hash_map::DefaultHasher::default();
-        // for gene in self.genome {
-        //     gene.hash(&mut state);
-        // }
-
-        // state.finish() as u32
     }
 
     #[inline]
     pub fn direction(&self) -> Direction {
         self.direction
     }
-
-    pub fn step(&self, _all_info_needed: usize) {}
 }
 
 #[cfg(test)]
@@ -58,7 +42,7 @@ mod test {
 
     #[test]
     fn turn() {
-        fn turn_right(being: &mut Being<0, 0>) {
+        fn turn_right(being: &mut Being) {
             let direction = being.direction();
             being.turn_right();
             match direction {
@@ -69,7 +53,7 @@ mod test {
             }
         }
 
-        fn turn_left(being: &mut Being<0, 0>) {
+        fn turn_left(being: &mut Being) {
             let direction = being.direction();
             being.turn_left();
             match direction {
@@ -83,7 +67,6 @@ mod test {
         let mut being = Being {
             direction: Direction::from(0),
             brain: Brain::new([].into_iter()),
-            genome: vec![],
         };
 
         for i in 0..8 {

@@ -3,7 +3,7 @@ mod signal;
 
 use neuron::{Dentrite, Hidden, Input, Neuron, Output, Ref, Sink, Source};
 pub use signal::Amplifier as Synapse;
-pub use signal::Signal as Stimuli;
+pub use signal::Signal as Stimulus;
 
 pub enum Axon<Input: Copy + Eq, Output: Copy + Eq, const H: u8> {
     Direct {
@@ -62,14 +62,14 @@ impl<Input: Copy + Eq, Output: Copy + Eq, const H: u8> Axon<Input, Output, H> {
     }
 }
 
-pub struct Brain<I: Copy + Eq, O: Copy + Eq> {
+pub struct Brain<I: Copy + Eq, O: Copy + Eq, const H: u8> {
     inputs: Vec<Input<I>>,
     hiddens: Vec<Hidden>,
     outputs: Vec<Output<O>>,
 }
 
-impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
-    pub fn new<const H: u8>(axons: impl Iterator<Item = Axon<I, O, H>>) -> Self {
+impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
+    pub fn new(axons: impl Iterator<Item = Axon<I, O, H>>) -> Self {
         let mut inputs: Vec<Input<I>> = vec![];
         let mut hiddens: Vec<Hidden> = vec![];
         let mut outputs: Vec<Output<O>> = vec![];
@@ -160,7 +160,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         }
     }
 
-    pub fn stimulus(&mut self, input: impl Copy + Fn(usize) -> Stimuli) -> Vec<(O, Stimuli)> {
+    pub fn stimuli(&mut self, input: impl Copy + Fn(I) -> Stimulus) -> Vec<(O, Stimulus)> {
         self.clear_visits();
 
         let mut output = Vec::with_capacity(self.outputs.len());
@@ -169,7 +169,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
             let signal = signal::aggregate(o.dentrites().map(|d| {
                 d.synapse * Self::update(&mut self.inputs, &mut self.hiddens, d.neuron, input)
             }));
-            output.push((o.index(), Stimuli::cap(signal)));
+            output.push((o.index(), Stimulus::cap(signal)));
         }
 
         output
@@ -184,7 +184,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         inputs: &mut Vec<Input<I>>,
         hiddens: &mut Vec<Hidden>,
         neuron_ref: Ref,
-        input: impl Copy + Fn(usize) -> Stimuli,
+        input: impl Copy + Fn(I) -> Stimulus,
     ) -> f32 {
         if neuron_ref.hidden {
             // SAFETY: References are never out of bounds
@@ -204,7 +204,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
             // SAFETY: References are never out of bounds
             let neuron = unsafe { inputs.get_unchecked_mut(neuron_ref.index) };
             if neuron.visit() {
-                neuron.latch(input(neuron_ref.index).as_f32());
+                neuron.latch(input(neuron.index()).as_f32());
             }
             neuron.latched()
         }
