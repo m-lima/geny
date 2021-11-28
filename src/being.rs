@@ -1,7 +1,9 @@
 use super::geo::Direction;
+use super::neural::Brain;
 
 pub struct Being {
     direction: Direction,
+    brain: Brain,
 }
 
 impl Being {

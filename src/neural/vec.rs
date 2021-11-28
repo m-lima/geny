@@ -301,7 +301,8 @@ impl<I: Copy + Eq, H: Copy + Eq, O: Copy + Eq> Brain<I, H, O> {
     ) -> Signal {
         match neuron_ref.layer {
             Layer::Input => {
-                let neuron = &mut inputs[neuron_ref.index];
+                // SAFETY: References are never out of bounds
+                let neuron = unsafe { inputs.get_unchecked_mut(neuron_ref.index) };
                 if !neuron.visited {
                     neuron.visited = true;
                     neuron.latch = input(neuron_ref.index);
@@ -309,7 +310,8 @@ impl<I: Copy + Eq, H: Copy + Eq, O: Copy + Eq> Brain<I, H, O> {
                 neuron.latch
             }
             Layer::Hidden => {
-                let neuron: *mut Hidden<H> = &mut hiddens[neuron_ref.index];
+                // SAFETY: References are never out of bounds
+                let neuron: *mut Hidden<H> = unsafe { hiddens.get_unchecked_mut(neuron_ref.index) };
                 // SAFETY: Safe because we never modify the list nor do we revisit a node
                 unsafe {
                     if !(*neuron).visited {
