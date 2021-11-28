@@ -47,22 +47,22 @@ fn main() -> anyhow::Result<()> {
     //     ),
     // ]);
 
-    for _ in 0..10 {
-        for index in 0..world.count() {
-            let outputs = brain.step(|input| Input::from(input).sense(&world, index));
-            for (output, signal) in outputs
-                .iter()
-                .enumerate()
-                .map(|(i, signal)| (Output::from(i), signal))
-            {
-                if rand::random::<f32>() < signal.as_f32() {
-                    output.act(&mut world, index);
-                }
-            }
-        }
+    // for _ in 0..10 {
+    //     for index in 0..world.count() {
+    //         let outputs = brain.step(|input| Input::from(input).sense(&world, index));
+    //         for (output, signal) in outputs
+    //             .iter()
+    //             .enumerate()
+    //             .map(|(i, signal)| (Output::from(i), signal))
+    //         {
+    //             if rand::random::<f32>() < signal.as_f32() {
+    //                 output.act(&mut world, index);
+    //             }
+    //         }
+    //     }
 
-        renderer::Renderer::render(&renderer::Terminal::<true>, &world);
-    }
+    //     renderer::Renderer::render(&renderer::Terminal::<true>, &world);
+    // }
 
     Ok(())
 }

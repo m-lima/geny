@@ -3,6 +3,7 @@ use super::geo::{Coordinate, Direction};
 
 pub struct World {
     size: u8,
+    // TODO: Beigns don't need to belong to world
     beings: Vec<Being>,
     coordinates: Vec<Coordinate>,
     // TODO: Consider maybe using a grid here as a cache to represent the locations
@@ -15,7 +16,7 @@ impl World {
 
         let count = count.min(u16::from(size) * u16::from(size));
 
-        let beings = (0..count).map(|_| Being::new()).collect();
+        let beings = (0..count).map(|_| Being::new(vec![])).collect();
         let coordinates = (0..size)
             .flat_map(|x| (0..size).map(|y| Coordinate::new(x, y)).collect::<Vec<_>>())
             .choose_multiple(&mut rand::thread_rng(), count as usize);

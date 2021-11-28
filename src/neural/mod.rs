@@ -1,3 +1,3 @@
 mod vec;
 
-pub use vec::{Brain, Gene, Signal};
+pub use vec::{Brain, Gene, Stimuli};
