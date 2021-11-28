@@ -108,7 +108,7 @@ impl Neuron<u8> for Hidden {
 impl Source<u8> for Hidden {
     #[inline]
     fn hidden() -> bool {
-        false
+        true
     }
 
     #[inline]
