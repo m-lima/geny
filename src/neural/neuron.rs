@@ -25,7 +25,7 @@ pub struct Ref {
 }
 
 pub struct Dentrite {
-    pub axon: Ref,
+    pub neuron: Ref,
     pub synapse: Synapse,
 }
 

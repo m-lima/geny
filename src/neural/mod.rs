@@ -5,7 +5,7 @@ use neuron::{Dentrite, Hidden, Input, Neuron, Output, Ref, Sink, Source};
 pub use signal::Amplifier as Synapse;
 pub use signal::Signal as Stimuli;
 
-pub enum Gene<Input: Copy + Eq, Output: Copy + Eq, const H: u8> {
+pub enum Axon<Input: Copy + Eq, Output: Copy + Eq, const H: u8> {
     Direct {
         input: Input,
         output: Output,
@@ -28,7 +28,7 @@ pub enum Gene<Input: Copy + Eq, Output: Copy + Eq, const H: u8> {
     },
 }
 
-impl<Input: Copy + Eq, Output: Copy + Eq, const H: u8> Gene<Input, Output, H> {
+impl<Input: Copy + Eq, Output: Copy + Eq, const H: u8> Axon<Input, Output, H> {
     pub fn direct(input: Input, output: Output, synapse: Synapse) -> Self {
         Self::Direct {
             input,
@@ -69,49 +69,47 @@ pub struct Brain<I: Copy + Eq, O: Copy + Eq> {
 }
 
 impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
-    pub fn new<const H: u8>(genome: &[Gene<I, O, H>]) -> Self {
-        const AMPLIFIER: f32 = 4.0;
-
+    pub fn new<const H: u8>(axons: impl Iterator<Item = Axon<I, O, H>>) -> Self {
         let mut inputs: Vec<Input<I>> = vec![];
         let mut hiddens: Vec<Hidden> = vec![];
         let mut outputs: Vec<Output<O>> = vec![];
 
-        for gene in genome {
-            match gene {
-                Gene::Direct {
+        for axon in axons {
+            match axon {
+                Axon::Direct {
                     input,
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(*input, *output, *synapse, &mut inputs, &mut outputs);
+                    Self::make_synapse(input, output, synapse, &mut inputs, &mut outputs);
                 }
-                Gene::IntoHidden {
+                Axon::IntoHidden {
                     input,
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(*input, *output, *synapse, &mut inputs, &mut hiddens);
+                    Self::make_synapse(input, output, synapse, &mut inputs, &mut hiddens);
                 }
-                Gene::InterHidden {
+                Axon::InterHidden {
                     input,
                     output,
                     synapse,
                 } => {
                     let hiddens: *mut Vec<Hidden> = &mut hiddens;
                     Self::make_synapse(
-                        *input,
-                        *output,
-                        *synapse,
+                        input,
+                        output,
+                        synapse,
                         unsafe { hiddens.as_mut().unwrap() },
                         unsafe { hiddens.as_mut().unwrap() },
                     );
                 }
-                Gene::FromHidden {
+                Axon::FromHidden {
                     input,
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(*input, *output, *synapse, &mut hiddens, &mut outputs);
+                    Self::make_synapse(input, output, synapse, &mut hiddens, &mut outputs);
                 }
             }
         }
@@ -145,7 +143,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         };
 
         let dentrite = Dentrite {
-            axon: Ref {
+            neuron: Ref {
                 hidden: NIn::hidden(),
                 index: input_index,
             },
@@ -169,7 +167,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
 
         for o in &self.outputs {
             let signal = signal::aggregate(o.dentrites().map(|d| {
-                d.synapse * Self::update(&mut self.inputs, &mut self.hiddens, d.axon, input)
+                d.synapse * Self::update(&mut self.inputs, &mut self.hiddens, d.neuron, input)
             }));
             output.push((o.index(), Stimuli::cap(signal)));
         }
@@ -197,7 +195,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
                     (*neuron).latch(signal::aggregate(
                         (*neuron)
                             .dentrites()
-                            .map(|d| d.synapse * Self::update(inputs, hiddens, d.axon, input)),
+                            .map(|d| d.synapse * Self::update(inputs, hiddens, d.neuron, input)),
                     ));
                 }
                 (*neuron).latched()

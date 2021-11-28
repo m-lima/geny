@@ -1,11 +1,13 @@
-use super::being::Being;
-use super::geo::{Coordinate, Direction};
+// TODO: Move geo in here
+use super::super::geo::{Coordinate, Direction};
+use super::Index;
 
 pub struct World {
     size: u8,
-    // TODO: Beigns don't need to belong to world
-    beings: Vec<Being>,
-    coordinates: Vec<Coordinate>,
+    beings: Vec<Coordinate>,
+    // Walls
+    // Foods
+    // Lava
     // TODO: Consider maybe using a grid here as a cache to represent the locations
 }
 
@@ -16,16 +18,11 @@ impl World {
 
         let count = count.min(u16::from(size) * u16::from(size));
 
-        let beings = (0..count).map(|_| Being::new(vec![])).collect();
-        let coordinates = (0..size)
+        let beings = (0..size)
             .flat_map(|x| (0..size).map(|y| Coordinate::new(x, y)).collect::<Vec<_>>())
             .choose_multiple(&mut rand::thread_rng(), count as usize);
 
-        Self {
-            size,
-            beings,
-            coordinates,
-        }
+        Self { size, beings }
     }
 
     #[inline]
@@ -33,29 +30,13 @@ impl World {
         self.size
     }
 
-    #[inline]
-    pub fn count(&self) -> usize {
-        self.beings.len()
+    pub fn being(&self, index: Index) -> Coordinate {
+        unsafe { *self.beings.get_unchecked(index.0) }
     }
 
-    pub fn being(&self, index: usize) -> &Being {
-        &self.beings[index]
-    }
-
-    pub fn being_mut(&mut self, index: usize) -> &mut Being {
-        &mut self.beings[index]
-    }
-
-    pub fn coordinate(&self, index: usize) -> Coordinate {
-        self.coordinates[index]
-    }
-
-    pub fn coordinates(&self) -> impl Iterator<Item = &Coordinate> {
-        self.coordinates.iter()
-    }
-
-    pub fn advance(&mut self, being: usize, direction: Direction) {
-        let coord = self.coordinates[being];
+    pub fn advance(&mut self, index: Index, direction: Direction) {
+        // SAFETY: Called from a sim step. Always within bounds
+        let coord = unsafe { self.beings.get_unchecked(index.0) };
 
         let dest = match direction {
             Direction::North if coord.y() > 0 => coord.neighbor(Direction::North),
@@ -68,8 +49,9 @@ impl World {
             Direction::West => return,
         };
 
-        if !self.coordinates.iter().enumerate().any(|(_, c)| *c == dest) {
-            self.coordinates[being] = dest;
+        if !self.beings.iter().enumerate().any(|(_, c)| *c == dest) {
+            // SAFETY: Previously checked for bounds
+            unsafe { *self.beings.get_unchecked_mut(index.0) = dest };
         }
     }
 }

@@ -1,12 +1,15 @@
 use super::super::being::Being;
 use super::super::geo::Direction;
-use super::{Renderer, World};
+use super::super::sim::Simulation;
+use super::Renderer;
 pub struct Terminal<const BORDER: bool>;
 
 impl<const BORDER: bool> Renderer for Terminal<BORDER> {
     // ALLOWED: Makes it easier to read
     #[allow(clippy::non_ascii_literal)]
-    fn render(&self, world: &World) {
+    fn render<const H: u8, const S: usize>(&self, simulation: &Simulation<H, S>) {
+        let world = simulation.world();
+
         if BORDER {
             print!("┏");
             for _ in 0..world.size() << 1 {
@@ -15,13 +18,11 @@ impl<const BORDER: bool> Renderer for Terminal<BORDER> {
             println!("┓");
         }
         let mut buffer =
-            vec![vec![Option::<&Being>::None; world.size() as usize]; world.size() as usize];
+            vec![vec![Option::<&Being<H, S>>::None; world.size() as usize]; world.size() as usize];
 
-        for (being, coord) in world
-            .coordinates()
-            .enumerate()
-            .map(|(i, c)| (world.being(i), c))
-        {
+        for index in simulation.indices() {
+            let coord = world.being(index);
+            let being = simulation.being(index);
             buffer[coord.y() as usize][coord.x() as usize] = Some(being);
         }
 

@@ -1,27 +1,30 @@
 #![allow(dead_code)]
 
+// TODO: Start with a "be at" for exclusion. Later add food. Later add reproduction without
+// generations. Later add preying
+
 mod being;
 mod geo;
 mod neural;
 mod renderer;
-mod world;
+mod sim;
 
 fn main() -> anyhow::Result<()> {
-    let mut args = std::env::args().skip(1);
+    // let mut args = std::env::args().skip(1);
 
-    let size = args
-        .next()
-        .ok_or(anyhow::anyhow!("No size provided"))?
-        .parse()?;
+    // let size = args
+    //     .next()
+    //     .ok_or(anyhow::anyhow!("No size provided"))?
+    //     .parse()?;
 
-    let count = args
-        .next()
-        .ok_or(anyhow::anyhow!("No count provided"))?
-        .parse()?;
+    // let count = args
+    //     .next()
+    //     .ok_or(anyhow::anyhow!("No count provided"))?
+    //     .parse()?;
 
-    let mut world = world::World::new(size, count);
+    // let mut world = world::World::new(size, count);
 
-    renderer::Renderer::render(&renderer::Terminal::<true>, &world);
+    // renderer::Renderer::render(&renderer::Terminal::<true>, &world);
 
     // let mut brain = neural::Brain::<3, 0, 4>::new::<4>(vec![
     //     neural::Gene::new(
