@@ -1,9 +1,17 @@
 use super::super::being::Being;
+use super::super::geo::Direction;
 use super::{Renderer, World};
-pub struct Terminal;
+pub struct Terminal<const BORDER: bool>;
 
-impl Renderer for Terminal {
+impl<const BORDER: bool> Renderer for Terminal<BORDER> {
     fn render(&self, world: &World) {
+        if BORDER {
+            print!("┏");
+            for _ in 0..world.size() << 1 {
+                print!("━");
+            }
+            println!("┓");
+        }
         let mut buffer =
             vec![vec![Option::<&Being>::None; world.size() as usize]; world.size() as usize];
 
@@ -16,6 +24,9 @@ impl Renderer for Terminal {
         }
 
         for row in buffer {
+            if BORDER {
+                print!("│");
+            }
             for cell in row {
                 if let Some(being) = cell {
                     let mut color = being.as_u24();
@@ -24,12 +35,41 @@ impl Renderer for Terminal {
                     let g = color & 0xff;
                     color >>= 8;
                     let r = color & 0xff;
-                    print!("[38;2;{:03};{:03};{:03}m\u{2588}\u{2588}[m", r, g, b);
+                    let direction = match being.direction() {
+                        Direction::North => "↑",
+                        Direction::East => "→",
+                        Direction::South => "↓",
+                        Direction::West => "←",
+                    };
+                    print!(
+                        "[48;2;{};{};{}m[38;2;{};{};{}m{}[38;2;{};{};{}m\u{2588}[m",
+                        r,
+                        g,
+                        b,
+                        !r & 0xff,
+                        !g & 0xff,
+                        !b & 0xff,
+                        direction,
+                        r,
+                        g,
+                        b
+                    );
                 } else {
                     print!("  ");
                 }
             }
-            println!();
+            if BORDER {
+                println!("│");
+            } else {
+                println!();
+            }
+        }
+        if BORDER {
+            print!("┗");
+            for _ in 0..world.size() << 1 {
+                print!("━");
+            }
+            print!("┛");
         }
         println!();
     }

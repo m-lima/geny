@@ -21,30 +21,48 @@ fn main() -> anyhow::Result<()> {
 
     let mut world = world::World::new(size, count);
 
-    renderer::Renderer::render(&renderer::Terminal, &world);
+    renderer::Renderer::render(&renderer::Terminal::<true>, &world);
 
-    let mut brain = neural::Brain::<3, 0, 4>::new::<4>(vec![neural::Gene::new(
-        true,
-        true,
-        Input::Random as usize,
-        Output::Advance as usize,
-        neural::Signal::cap(1.0),
-    )]);
+    let mut brain = neural::Brain::<3, 0, 4>::new::<4>(vec![
+        neural::Gene::new(
+            true,
+            true,
+            Input::Random as usize,
+            Output::Advance as usize,
+            neural::Signal::cap(1.0),
+        ),
+        neural::Gene::new(
+            true,
+            true,
+            Input::DirectionHorizontal as usize,
+            Output::TurnLeft as usize,
+            neural::Signal::cap(1.0),
+        ),
+        neural::Gene::new(
+            true,
+            true,
+            Input::DirectionVertical as usize,
+            Output::TurnLeft as usize,
+            neural::Signal::cap(0.5),
+        ),
+    ]);
 
-    // brain.connect(0, 0, 0, 3, 1.0);
-
-    for index in 0..world.count() {
-        let outputs = brain.step(|input| Input::from(input).sense(&world, index));
-        for (output, _) in outputs
-            .iter()
-            .enumerate()
-            .map(|(i, signal)| (Output::from(i), signal))
-        {
-            output.act(&mut world, index);
+    for _ in 0..10 {
+        for index in 0..world.count() {
+            let outputs = brain.step(|input| Input::from(input).sense(&world, index));
+            for (output, signal) in outputs
+                .iter()
+                .enumerate()
+                .map(|(i, signal)| (Output::from(i), signal))
+            {
+                if rand::random::<f32>() < signal.as_f32() {
+                    output.act(&mut world, index);
+                }
+            }
         }
-    }
 
-    renderer::Renderer::render(&renderer::Terminal, &world);
+        renderer::Renderer::render(&renderer::Terminal::<true>, &world);
+    }
 
     Ok(())
 }
@@ -108,10 +126,17 @@ impl Output {
 
     fn act(self, world: &mut world::World, index: usize) {
         match self {
-            Self::Noop => {}
-            Self::TurnLeft => world.being_mut(index).turn_left(),
-            Self::TurnRight => world.being_mut(index).turn_right(),
+            Self::Noop => println!("Noop"),
+            Self::TurnLeft => {
+                println!("Tunr left");
+                world.being_mut(index).turn_left()
+            }
+            Self::TurnRight => {
+                println!("Tunr right");
+                world.being_mut(index).turn_right()
+            }
             Self::Advance => {
+                println!("Advancing");
                 let direction = world.being(index).direction();
                 world.advance(index, direction);
             }

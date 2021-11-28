@@ -21,6 +21,14 @@ impl Being {
 
     pub fn as_u24(&self) -> u32 {
         rand::random()
+        // use std::hash::{Hash, Hasher};
+
+        // let mut state = std::collections::hash_map::DefaultHasher::default();
+        // for gene in self.genome {
+        //     gene.hash(&mut state);
+        // }
+
+        // state.finish() as u32
     }
 
     #[inline]
