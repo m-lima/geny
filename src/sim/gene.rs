@@ -67,7 +67,7 @@ impl Gene {
         let output = value & 0b1_1111;
         value >>= 5;
 
-        let conn_type = value & 0b11;
+        let conn_type = if hidden_neurons == 0 { 0 } else { value & 0b11 };
 
         // ALLOWED: Bitmask above already keeps values in range
         #[allow(clippy::cast_possible_truncation)]
