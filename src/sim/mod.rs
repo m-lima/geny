@@ -49,6 +49,19 @@ impl Simulation {
         }
     }
 
+    // TODO: This is garbage!
+    pub fn replace(&mut self, population: Vec<Genome>, hidden_neurons: u8) {
+        assert!(self.genomes.len() == population.len());
+        self.genomes = population;
+        self.world.shuffle();
+        self.beings = self
+            .genomes
+            .iter()
+            .map(|g| g.to_brain(hidden_neurons))
+            .map(Being::new)
+            .collect();
+    }
+
     #[inline]
     pub fn world(&self) -> &World {
         &self.world

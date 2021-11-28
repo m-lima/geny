@@ -25,6 +25,19 @@ impl World {
         Self { size, beings }
     }
 
+    // TODO: This is trash!
+    pub fn shuffle(&mut self) {
+        use rand::seq::IteratorRandom;
+
+        self.beings = (0..self.size)
+            .flat_map(|x| {
+                (0..self.size)
+                    .map(|y| Coordinate::new(x, y))
+                    .collect::<Vec<_>>()
+            })
+            .choose_multiple(&mut rand::thread_rng(), self.beings.len());
+    }
+
     #[inline]
     pub fn size(&self) -> u8 {
         self.size
