@@ -4,6 +4,8 @@ use super::{Renderer, World};
 pub struct Terminal<const BORDER: bool>;
 
 impl<const BORDER: bool> Renderer for Terminal<BORDER> {
+    // ALLOWED: Makes it easier to read
+    #[allow(clippy::non_ascii_literal)]
     fn render(&self, world: &World) {
         if BORDER {
             print!("┏");

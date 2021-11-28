@@ -102,11 +102,11 @@ impl Output {
             Self::Noop => println!("Noop"),
             Self::TurnLeft => {
                 println!("Tunr left");
-                world.being_mut(index).turn_left()
+                world.being_mut(index).turn_left();
             }
             Self::TurnRight => {
                 println!("Tunr right");
-                world.being_mut(index).turn_right()
+                world.being_mut(index).turn_right();
             }
             Self::Advance => {
                 println!("Advancing");

@@ -1,122 +1,188 @@
+use neuron::{Dentrite, Hidden, Input, Neuron, Output, Ref, Sink, Source};
 pub use signal::Amplifier as Synapse;
 pub use signal::Signal as Stimuli;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum Layer {
-    Input,
-    Hidden,
-}
+mod neuron {
+    use super::Synapse;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-struct NeuronRef {
-    layer: Layer,
-    index: usize,
-}
+    pub trait Neuron<I: Copy + Eq> {
+        fn new(index: I) -> Self;
+        fn index(&self) -> I;
+    }
 
-struct Dentrite {
-    axon: NeuronRef,
-    synapse: Synapse,
-}
+    pub trait Source<I: Copy + Eq>: Neuron<I> {
+        fn hidden() -> bool;
+        fn visit(&mut self) -> bool;
+        fn unvisit(&mut self);
+        fn latched(&self) -> f32;
+        fn latch(&mut self, latch: f32);
+    }
 
-trait Neuron<I: Copy + Eq> {
-    fn index(&self) -> I;
-}
+    pub trait Sink<I: Copy + Eq>: Neuron<I> {
+        fn dentrites(&self) -> std::slice::Iter<'_, Dentrite>;
+        fn dentrites_mut(&mut self) -> &mut Vec<Dentrite>;
+    }
 
-trait OutNeuron<I: Copy + Eq>: Neuron<I> {
-    fn dentrites(&self) -> &Vec<Dentrite>;
-    fn dentrites_mut(&mut self) -> &mut Vec<Dentrite>;
-}
+    #[derive(Copy, Clone, Eq, PartialEq)]
+    pub struct Ref {
+        pub hidden: bool,
+        pub index: usize,
+    }
 
-struct Input<I: Copy + Eq> {
-    index: I,
-    latch: f32,
-    visited: bool,
-}
+    pub struct Dentrite {
+        pub axon: Ref,
+        pub synapse: Synapse,
+    }
 
-impl<I: Copy + Eq> Input<I> {
-    fn new(index: I) -> Self {
-        Self {
-            index,
-            latch: 0.0,
-            visited: false,
+    pub struct Input<I: Copy + Eq> {
+        index: I,
+        latch: f32,
+        visited: bool,
+    }
+
+    impl<I: Copy + Eq> Neuron<I> for Input<I> {
+        fn new(index: I) -> Self {
+            Self {
+                index,
+                latch: 0.0,
+                visited: false,
+            }
+        }
+
+        #[inline]
+        fn index(&self) -> I {
+            self.index
         }
     }
-}
 
-impl<I: Copy + Eq> Neuron<I> for Input<I> {
-    #[inline]
-    fn index(&self) -> I {
-        self.index
-    }
-}
+    impl<I: Copy + Eq> Source<I> for Input<I> {
+        #[inline]
+        fn hidden() -> bool {
+            false
+        }
 
-struct Hidden {
-    index: u8,
-    dentrites: Vec<Dentrite>,
-    latch: f32,
-    visited: bool,
-}
+        #[inline]
+        fn visit(&mut self) -> bool {
+            if self.visited {
+                false
+            } else {
+                self.visited = true;
+                true
+            }
+        }
 
-impl Hidden {
-    fn new(index: u8) -> Self {
-        Self {
-            index,
-            dentrites: vec![],
-            latch: 0.0,
-            visited: false,
+        #[inline]
+        fn unvisit(&mut self) {
+            self.visited = false;
+        }
+
+        #[inline]
+        fn latched(&self) -> f32 {
+            self.latch
+        }
+
+        #[inline]
+        fn latch(&mut self, latch: f32) {
+            self.latch = latch;
         }
     }
-}
 
-impl Neuron<u8> for Hidden {
-    #[inline]
-    fn index(&self) -> u8 {
-        self.index
-    }
-}
-
-impl OutNeuron<u8> for Hidden {
-    #[inline]
-    fn dentrites(&self) -> &Vec<Dentrite> {
-        &self.dentrites
+    pub struct Hidden {
+        index: u8,
+        dentrites: Vec<Dentrite>,
+        latch: f32,
+        visited: bool,
     }
 
-    #[inline]
-    fn dentrites_mut(&mut self) -> &mut Vec<Dentrite> {
-        &mut self.dentrites
-    }
-}
+    impl Neuron<u8> for Hidden {
+        fn new(index: u8) -> Self {
+            Self {
+                index,
+                dentrites: vec![],
+                latch: 0.0,
+                visited: false,
+            }
+        }
 
-struct Output<I: Copy + Eq> {
-    index: I,
-    dentrites: Vec<Dentrite>,
-}
-
-impl<I: Copy + Eq> Output<I> {
-    fn new(index: I) -> Self {
-        Self {
-            index,
-            dentrites: vec![],
+        #[inline]
+        fn index(&self) -> u8 {
+            self.index
         }
     }
-}
 
-impl<I: Copy + Eq> Neuron<I> for Output<I> {
-    #[inline]
-    fn index(&self) -> I {
-        self.index
+    impl Source<u8> for Hidden {
+        #[inline]
+        fn hidden() -> bool {
+            false
+        }
+
+        #[inline]
+        fn visit(&mut self) -> bool {
+            if self.visited {
+                false
+            } else {
+                self.visited = true;
+                true
+            }
+        }
+
+        #[inline]
+        fn unvisit(&mut self) {
+            self.visited = false;
+        }
+
+        #[inline]
+        fn latched(&self) -> f32 {
+            self.latch
+        }
+
+        #[inline]
+        fn latch(&mut self, latch: f32) {
+            self.latch = latch;
+        }
     }
-}
 
-impl<I: Copy + Eq> OutNeuron<I> for Output<I> {
-    #[inline]
-    fn dentrites(&self) -> &Vec<Dentrite> {
-        &self.dentrites
+    impl Sink<u8> for Hidden {
+        #[inline]
+        fn dentrites(&self) -> std::slice::Iter<'_, Dentrite> {
+            self.dentrites.iter()
+        }
+
+        #[inline]
+        fn dentrites_mut(&mut self) -> &mut Vec<Dentrite> {
+            &mut self.dentrites
+        }
     }
 
-    #[inline]
-    fn dentrites_mut(&mut self) -> &mut Vec<Dentrite> {
-        &mut self.dentrites
+    pub struct Output<I: Copy + Eq> {
+        index: I,
+        dentrites: Vec<Dentrite>,
+    }
+
+    impl<I: Copy + Eq> Neuron<I> for Output<I> {
+        fn new(index: I) -> Self {
+            Self {
+                index,
+                dentrites: vec![],
+            }
+        }
+
+        #[inline]
+        fn index(&self) -> I {
+            self.index
+        }
+    }
+
+    impl<I: Copy + Eq> Sink<I> for Output<I> {
+        #[inline]
+        fn dentrites(&self) -> std::slice::Iter<'_, Dentrite> {
+            self.dentrites.iter()
+        }
+
+        #[inline]
+        fn dentrites_mut(&mut self) -> &mut Vec<Dentrite> {
+            &mut self.dentrites
+        }
     }
 }
 
@@ -174,30 +240,14 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(
-                        *input,
-                        *output,
-                        *synapse,
-                        &mut inputs,
-                        &mut outputs,
-                        Input::new,
-                        Output::new,
-                    );
+                    Self::make_synapse(*input, *output, *synapse, &mut inputs, &mut outputs);
                 }
                 Gene::IntoHidden {
                     input,
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(
-                        *input,
-                        *output,
-                        *synapse,
-                        &mut inputs,
-                        &mut hiddens,
-                        Input::new,
-                        Hidden::new,
-                    );
+                    Self::make_synapse(*input, *output, *synapse, &mut inputs, &mut hiddens);
                 }
                 Gene::InterHidden {
                     input,
@@ -211,8 +261,6 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
                         *synapse,
                         unsafe { hiddens.as_mut().unwrap() },
                         unsafe { hiddens.as_mut().unwrap() },
-                        Hidden::new,
-                        Hidden::new,
                     );
                 }
                 Gene::FromHidden {
@@ -220,15 +268,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
                     output,
                     synapse,
                 } => {
-                    Self::make_synapse(
-                        *input,
-                        *output,
-                        *synapse,
-                        &mut hiddens,
-                        &mut outputs,
-                        Hidden::new,
-                        Output::new,
-                    );
+                    Self::make_synapse(*input, *output, *synapse, &mut hiddens, &mut outputs);
                 }
             }
         }
@@ -240,21 +280,12 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         }
     }
 
-    fn make_synapse<
-        In: Copy + Eq,
-        Out: Copy + Eq,
-        NIn: Neuron<In>,
-        NOut: OutNeuron<Out>,
-        BIn: Fn(In) -> NIn,
-        BOut: Fn(Out) -> NOut,
-    >(
+    fn make_synapse<In: Copy + Eq, Out: Copy + Eq, NIn: Source<In>, NOut: Sink<Out>>(
         input: In,
         output: Out,
         synapse: Synapse,
         inputs: &mut Vec<NIn>,
         outputs: &mut Vec<NOut>,
-        in_builder: BIn,
-        out_builder: BOut,
     ) {
         // ALLOWED: We need to mutate `inputs` in the else case
         #[allow(clippy::option_if_let_else)]
@@ -266,13 +297,13 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         {
             idx
         } else {
-            inputs.push(in_builder(input));
+            inputs.push(NIn::new(input));
             inputs.len() - 1
         };
 
         let dentrite = Dentrite {
-            axon: NeuronRef {
-                layer: Layer::Input,
+            axon: Ref {
+                hidden: NIn::hidden(),
                 index: input_index,
             },
             synapse,
@@ -282,7 +313,7 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
             // TODO: Can we precalculate what these two synapses would do to an input signal?
             output.dentrites_mut().push(dentrite);
         } else {
-            let mut output = out_builder(output);
+            let mut output = NOut::new(output);
             output.dentrites_mut().push(dentrite);
             outputs.push(output);
         }
@@ -294,53 +325,47 @@ impl<I: Copy + Eq, O: Copy + Eq> Brain<I, O> {
         let mut output = Vec::with_capacity(self.outputs.len());
 
         for o in &self.outputs {
-            let signal = signal::aggregate(o.dentrites.iter().map(|d| {
+            let signal = signal::aggregate(o.dentrites().map(|d| {
                 d.synapse * Self::update(&mut self.inputs, &mut self.hiddens, d.axon, input)
             }));
-            output.push((o.index, Stimuli::cap(signal)));
+            output.push((o.index(), Stimuli::cap(signal)));
         }
 
         output
     }
 
     fn clear_visits(&mut self) {
-        self.inputs.iter_mut().for_each(|i| i.visited = false);
-        self.hiddens.iter_mut().for_each(|i| i.visited = false);
+        self.inputs.iter_mut().for_each(Source::unvisit);
+        self.hiddens.iter_mut().for_each(Source::unvisit);
     }
 
     fn update(
         inputs: &mut Vec<Input<I>>,
         hiddens: &mut Vec<Hidden>,
-        neuron_ref: NeuronRef,
+        neuron_ref: Ref,
         input: impl Copy + Fn(usize) -> Stimuli,
     ) -> f32 {
-        match neuron_ref.layer {
-            Layer::Input => {
-                // SAFETY: References are never out of bounds
-                let neuron = unsafe { inputs.get_unchecked_mut(neuron_ref.index) };
-                if !neuron.visited {
-                    neuron.visited = true;
-                    neuron.latch = input(neuron_ref.index).as_f32();
+        if neuron_ref.hidden {
+            // SAFETY: References are never out of bounds
+            let neuron: *mut Hidden = unsafe { hiddens.get_unchecked_mut(neuron_ref.index) };
+            // SAFETY: Safe because we never modify the list nor do we revisit a node
+            unsafe {
+                if (*neuron).visit() {
+                    (*neuron).latch(signal::aggregate(
+                        (*neuron)
+                            .dentrites()
+                            .map(|d| d.synapse * Self::update(inputs, hiddens, d.axon, input)),
+                    ));
                 }
-                neuron.latch
+                (*neuron).latched()
             }
-            Layer::Hidden => {
-                // SAFETY: References are never out of bounds
-                let neuron: *mut Hidden = unsafe { hiddens.get_unchecked_mut(neuron_ref.index) };
-                // SAFETY: Safe because we never modify the list nor do we revisit a node
-                unsafe {
-                    if !(*neuron).visited {
-                        (*neuron).visited = true;
-                        (*neuron).latch = signal::aggregate(
-                            (*neuron)
-                                .dentrites
-                                .iter()
-                                .map(|d| d.synapse * Self::update(inputs, hiddens, d.axon, input)),
-                        );
-                    }
-                    (*neuron).latch
-                }
+        } else {
+            // SAFETY: References are never out of bounds
+            let neuron = unsafe { inputs.get_unchecked_mut(neuron_ref.index) };
+            if neuron.visit() {
+                neuron.latch(input(neuron_ref.index).as_f32());
             }
+            neuron.latched()
         }
     }
 }
@@ -377,7 +402,7 @@ mod signal {
 
     impl From<u8> for Signal {
         fn from(value: u8) -> Self {
-            Self(value as f32 / (u8::MAX as f32))
+            Self(f32::from(value) / f32::from(u8::MAX))
         }
     }
 
