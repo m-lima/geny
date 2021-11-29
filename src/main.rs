@@ -8,8 +8,8 @@ macro_rules! build_vec {
     }};
 }
 
+mod engine;
 mod neural;
-mod renderer;
 mod sim;
 
 fn main() -> anyhow::Result<()> {
@@ -35,15 +35,24 @@ fn main() -> anyhow::Result<()> {
         .ok_or(anyhow::anyhow!("No hidden neuron count provided"))?
         .parse()?;
 
-    let mut simulation = sim::Simulation::new(size, beings, synapses, hidden_neurons);
+    let terminal = args.next().map(|s| s.trim() == "t").is_some();
 
-    renderer::Renderer::render(&renderer::Terminal::<true>, &simulation);
+    let simulation = sim::Simulation::new(size, beings, synapses, hidden_neurons);
 
-    while simulation.step() {
-        println!("[67A");
-        // println!("[68AGeneration: [37m{}[m", g);
-        renderer::Renderer::render(&renderer::Terminal::<true>, &simulation);
-        // std::thread::sleep(std::time::Duration::from_millis(50));
+    if terminal {
+        use engine::Engine;
+        let terminal = engine::Terminal::<true>;
+        terminal.start(simulation);
+    } else {
+        use engine::Engine;
+        let quad = engine::Quad::new(macroquad::window::Conf {
+            window_title: String::from("Geny"),
+            window_width: 1024,
+            window_height: 1024,
+            window_resizable: false,
+            ..Default::default()
+        });
+        quad.start(simulation);
     }
 
     Ok(())

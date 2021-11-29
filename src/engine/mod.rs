@@ -4,6 +4,9 @@ use super::sim::Simulation;
 mod terminal;
 pub use terminal::Terminal;
 
-pub trait Renderer {
-    fn render(&self, simulation: &Simulation);
+mod quad;
+pub use quad::Quad;
+
+pub trait Engine {
+    fn start(self, simulation: Simulation);
 }
