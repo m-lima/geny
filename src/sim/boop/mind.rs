@@ -225,16 +225,20 @@ impl Output {
     }
 
     fn spike(self, stimulus: Stimulus) -> Option<Self> {
-        if rand::random::<f32>() < stimulus.as_f32() {
-            Some(self)
-        } else {
-            None
+        match self {
+            Self::TurnLeft | Self::TurnRight | Self::Advance => {
+                if rand::random::<f32>() < stimulus.as_f32() {
+                    Some(self)
+                } else {
+                    None
+                }
+            }
+            Self::Noop => None,
         }
     }
 
     fn act(self, simulation: &mut Simulation, index: Index) {
         match self {
-            Self::Noop => {}
             Self::TurnLeft => {
                 simulation.boop_mut(index).turn_left();
             }
@@ -245,6 +249,7 @@ impl Output {
                 let direction = simulation.boop(index).direction();
                 simulation.world.advance(index, direction);
             }
+            Self::Noop => {}
         }
     }
 }
