@@ -18,10 +18,8 @@ impl Engine for Quad {
                     33, 33, 33, 255,
                 ));
 
-                let x_scale =
-                    (macroquad::window::screen_width() - 20.) / f32::from(simulation.size());
-                let y_scale =
-                    (macroquad::window::screen_height() - 20.) / f32::from(simulation.size());
+                let scale = macroquad::window::screen_height() / f32::from(simulation.size());
+                let scale2 = scale / 2.;
 
                 for boop in simulation.boops() {
                     let coord = boop.coordinate();
@@ -29,10 +27,10 @@ impl Engine for Quad {
                     let color = signature_to_color(boop.signature());
 
                     macroquad::shapes::draw_poly(
-                        10. + coord.x() * x_scale,
-                        10. + coord.y() * y_scale,
+                        scale2 + coord.x() * scale,
+                        scale2 + coord.y() * scale,
                         3,
-                        10.,
+                        scale2,
                         direction,
                         color,
                     );

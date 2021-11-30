@@ -27,7 +27,7 @@ impl World {
 
         Self {
             size,
-            sizef: f32::from(size),
+            sizef: f32::from(size - 1),
             coord,
         }
     }
@@ -48,6 +48,9 @@ impl World {
     }
 
     pub fn advance(&mut self, index: Index, speed: f32, direction: Direction) {
+        const SIXTY: f32 = std::f32::consts::FRAC_PI_3;
+        const ONE_TWENTY: f32 = 2. * std::f32::consts::FRAC_PI_3;
+
         let mut coord = self.coord(index);
 
         if let Some((neighbor, mut dist)) = self
@@ -59,14 +62,15 @@ impl World {
                 if *c == coord {
                     // Skip self
                     None
-                } else if c.dir_from(coord).0.abs() - direction.0 > std::f32::consts::FRAC_PI_4 {
-                    // Skip if not within 45 degrees from `direction`
+                } else if Direction::new(SIXTY + c.dir_from(coord).0 - direction.0).0 > ONE_TWENTY {
+                    // TODO: Instead of a 120deg angle, maybe cast a rays for each side of the body
+                    // Skip if not within 60 degrees from `direction`
                     None
                 } else {
                     // Only if close enough to collide
                     let dist = c.distance(coord);
-                    if dist < speed {
-                        Some((c, dist))
+                    if dist < speed + 1. {
+                        Some((c, dist - 1.))
                     } else {
                         None
                     }
@@ -81,15 +85,17 @@ impl World {
                 Some((cc, cd))
             })
         {
-            while dist > 0.01 {
-                println!("Advance {}", dist);
+            let mut prev = f32::MAX;
+            while dist > 0.01 && dist < prev {
                 coord.translate(direction, dist);
-                dist = neighbor.distance(coord);
+                prev = dist;
+                dist = neighbor.distance(coord) - 1.;
             }
         } else {
             coord.translate(direction, speed);
         }
 
+        // TODO: These walls allow boops to go on top of each other by sliding
         if coord.0 < 0. {
             coord.0 = 0.;
         } else if coord.0 > self.sizef {
@@ -115,7 +121,9 @@ pub struct Direction(f32);
 
 impl Direction {
     pub fn new(rads: f32) -> Self {
-        Self(rads)
+        let mut this = Self(rads);
+        this.desaturate();
+        this
     }
 
     fn desaturate(&mut self) {
@@ -180,7 +188,7 @@ impl Coordinate {
 
     pub fn dir_from(self, rhs: Self) -> Direction {
         let vec = self - rhs;
-        Direction(vec.0.atan2(vec.1))
+        Direction(vec.1.atan2(vec.0))
     }
 
     pub fn translate(&mut self, dir: Direction, amount: f32) {
@@ -194,26 +202,35 @@ impl Coordinate {
     }
 }
 
-// TODO: Remove if uneeded
-// impl std::ops::Add for Coordinate {
-//     type Output = Self;
-
-//     fn add(self, rhs: Self) -> Self::Output {
-//         Self(self.0 + rhs.0, self.1 + rhs.1)
-//     }
-// }
-
-// impl std::ops::AddAssign for Coordinate {
-//     fn add_assign(&mut self, rhs: Self) {
-//         self.0 += rhs.0;
-//         self.1 += rhs.1;
-//     }
-// }
-
 impl std::ops::Sub for Coordinate {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0, self.1 - rhs.1)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Coordinate, Direction};
+
+    #[test]
+    fn manhattan() {
+        for _ in 0..10 {
+            let ax = rand::random();
+            let ay = rand::random();
+            let bx = rand::random();
+            let by = rand::random();
+            let manhattan = Coordinate(ax, ay) - Coordinate(bx, by);
+            assert!(manhattan.0 - (ax - bx) <= f32::EPSILON);
+            assert!(manhattan.1 - (ay - by) <= f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn dir_from() {
+        let c1 = Coordinate(0., 0.);
+        assert!(Coordinate(1., 0.).dir_from(c1) == Direction(0.),);
+        assert!(Coordinate(0., 1.).dir_from(c1) == Direction(0.),);
     }
 }
