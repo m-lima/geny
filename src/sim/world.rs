@@ -59,7 +59,7 @@ impl World {
                 if *c == coord {
                     // Skip self
                     None
-                } else if c.direction(coord).0.abs() - direction.0 > std::f32::consts::PI / 4. {
+                } else if c.dir_from(coord).0.abs() - direction.0 > std::f32::consts::FRAC_PI_4 {
                     // Skip if not within 45 degrees from `direction`
                     None
                 } else {
@@ -178,7 +178,7 @@ impl Coordinate {
         Self(self.0.abs(), self.1.abs())
     }
 
-    pub fn direction(self, rhs: Self) -> Direction {
+    pub fn dir_from(self, rhs: Self) -> Direction {
         let vec = self - rhs;
         Direction(vec.0.atan2(vec.1))
     }

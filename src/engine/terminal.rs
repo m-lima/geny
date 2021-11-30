@@ -37,13 +37,13 @@ fn render<const BORDER: bool>(simulation: &Simulation) {
         let coord = boop.coordinate();
         let direction = {
             let dir = boop.direction().as_rad();
-            if dir <= std::f32::consts::PI / 4. {
+            if dir <= std::f32::consts::FRAC_PI_4 {
                 '→'
-            } else if dir <= std::f32::consts::PI * 3. / 4. {
+            } else if dir <= std::f32::consts::FRAC_PI_4 * 3. {
                 '↓'
-            } else if dir <= std::f32::consts::PI * 5. / 4. {
+            } else if dir <= std::f32::consts::FRAC_PI_4 * 5. {
                 '←'
-            } else if dir <= std::f32::consts::PI * 7. / 4. {
+            } else if dir <= std::f32::consts::FRAC_PI_4 * 7. {
                 '↑'
             } else {
                 '→'
