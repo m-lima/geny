@@ -1,5 +1,5 @@
 use super::Engine;
-use crate::sim::{Direction, Simulation};
+use crate::sim::Simulation;
 
 pub struct Quad(macroquad::window::Conf);
 
@@ -19,23 +19,18 @@ impl Engine for Quad {
                 ));
 
                 let x_scale =
-                    (macroquad::window::screen_width() - 10.) / f32::from(simulation.size());
+                    (macroquad::window::screen_width() - 20.) / f32::from(simulation.size());
                 let y_scale =
-                    (macroquad::window::screen_height() - 10.) / f32::from(simulation.size());
+                    (macroquad::window::screen_height() - 20.) / f32::from(simulation.size());
 
                 for boop in simulation.boops() {
                     let coord = boop.coordinate();
-                    let direction = match boop.direction() {
-                        Direction::North => -90.,
-                        Direction::East => 0.,
-                        Direction::South => 90.,
-                        Direction::West => 180.,
-                    };
+                    let direction = boop.direction().as_rad().to_degrees();
                     let color = signature_to_color(boop.signature());
 
                     macroquad::shapes::draw_poly(
-                        10. + f32::from(coord.x()) * x_scale,
-                        10. + f32::from(coord.y()) * y_scale,
+                        10. + coord.x() * x_scale,
+                        10. + coord.y() * y_scale,
                         3,
                         10.,
                         direction,

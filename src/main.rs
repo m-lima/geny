@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
             window_width: 1024,
             window_height: 1024,
             window_resizable: false,
-            ..Default::default()
+            ..macroquad::window::Conf::default()
         });
         quad.start(simulation);
     }

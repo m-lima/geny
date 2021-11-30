@@ -9,7 +9,7 @@ pub struct Body {
 impl Body {
     pub fn new() -> Self {
         Self {
-            direction: Direction::from(rand::random()),
+            direction: Direction::new(rand::random()),
             age: 0,
             hunger: 0,
         }
@@ -37,53 +37,12 @@ impl Body {
     }
 
     #[inline]
-    pub fn turn_right(&mut self) {
-        self.direction = Direction::from(self.direction as u8 + 1);
+    pub fn turn_right(&mut self, amount: f32) {
+        self.direction += amount;
     }
 
     #[inline]
-    pub fn turn_left(&mut self) {
-        self.direction = Direction::from((self.direction as u8).wrapping_sub(1));
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{Body, Direction};
-
-    #[test]
-    fn turn() {
-        fn turn_right(body: &mut Body) {
-            let direction = body.direction();
-            body.turn_right();
-            match direction {
-                Direction::North => assert_eq!(body.direction(), Direction::East),
-                Direction::East => assert_eq!(body.direction(), Direction::South),
-                Direction::South => assert_eq!(body.direction(), Direction::West),
-                Direction::West => assert_eq!(body.direction(), Direction::North),
-            }
-        }
-
-        fn turn_left(body: &mut Body) {
-            let direction = body.direction();
-            body.turn_left();
-            match direction {
-                Direction::North => assert_eq!(body.direction(), Direction::West),
-                Direction::West => assert_eq!(body.direction(), Direction::South),
-                Direction::South => assert_eq!(body.direction(), Direction::East),
-                Direction::East => assert_eq!(body.direction(), Direction::North),
-            }
-        }
-
-        let mut body = Body::new();
-        body.direction = Direction::from(0);
-
-        for _ in 0..8 {
-            turn_right(&mut body);
-        }
-
-        for _ in 0..16 {
-            turn_left(&mut body);
-        }
+    pub fn turn_left(&mut self, amount: f32) {
+        self.direction -= amount;
     }
 }

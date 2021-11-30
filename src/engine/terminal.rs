@@ -1,5 +1,5 @@
 use super::Engine;
-use crate::sim::{Direction, Simulation};
+use crate::sim::Simulation;
 
 pub struct Terminal<const BORDER: bool>;
 
@@ -31,13 +31,23 @@ fn render<const BORDER: bool>(simulation: &Simulation) {
         simulation.size() as usize
     ];
 
+    // ALLOWED: Coord is never negative or out of bounds, due to `World::advance`
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     for boop in simulation.boops() {
         let coord = boop.coordinate();
-        let direction = match boop.direction() {
-            Direction::North => '↑',
-            Direction::East => '→',
-            Direction::South => '↓',
-            Direction::West => '←',
+        let direction = {
+            let dir = boop.direction().as_rad();
+            if dir <= std::f32::consts::PI / 4. {
+                '→'
+            } else if dir <= std::f32::consts::PI * 3. / 4. {
+                '↓'
+            } else if dir <= std::f32::consts::PI * 5. / 4. {
+                '←'
+            } else if dir <= std::f32::consts::PI * 7. / 4. {
+                '↑'
+            } else {
+                '→'
+            }
         };
         let signature = boop.signature();
         buffer[coord.y() as usize][coord.x() as usize] = Some((direction, signature));

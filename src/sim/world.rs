@@ -1,7 +1,8 @@
 use super::Index;
 
 pub struct World {
-    size: f32,
+    size: u8,
+    sizef: f32,
     coord: Vec<Coordinate>,
     // Walls
     // Foods
@@ -25,13 +26,14 @@ impl World {
             .choose_multiple(&mut rand::thread_rng(), count as usize);
 
         Self {
-            size: f32::from(count),
+            size,
+            sizef: f32::from(size),
             coord,
         }
     }
 
     #[inline]
-    pub fn size(&self) -> f32 {
+    pub fn size(&self) -> u8 {
         self.size
     }
 
@@ -46,18 +48,28 @@ impl World {
     }
 
     pub fn advance(&mut self, index: Index, speed: f32, direction: Direction) {
-        let coord = self.coord_mut(index);
+        let mut coord = self.coord(index);
 
         if let Some((neighbor, mut dist)) = self
             .coord
             .iter()
-            .filter(|c| c.direction(*coord).0.abs() <= std::f32::consts::PI / 4.) // Only in a cone in front
             .filter_map(|c| {
-                let dist = c.distance(*coord);
-                if dist < speed {
-                    Some((c, dist))
-                } else {
+                // ALLOWED: So that we can comment the steps
+                #[allow(clippy::if_same_then_else)]
+                if *c == coord {
+                    // Skip self
                     None
+                } else if c.direction(coord).0.abs() - direction.0 > std::f32::consts::PI / 4. {
+                    // Skip if not within 45 degrees from `direction`
+                    None
+                } else {
+                    // Only if close enough to collide
+                    let dist = c.distance(coord);
+                    if dist < speed {
+                        Some((c, dist))
+                    } else {
+                        None
+                    }
                 }
             })
             .fold(None, |acc, (cc, cd)| {
@@ -70,22 +82,27 @@ impl World {
             })
         {
             while dist > 0.01 {
+                println!("Advance {}", dist);
                 coord.translate(direction, dist);
-                dist = neighbor.distance(*coord);
+                dist = neighbor.distance(coord);
             }
+        } else {
+            coord.translate(direction, speed);
         }
 
-        if coord.x() < 0. {
-            coord.set_x(0.);
-        } else if coord.x() > self.size {
-            coord.set_x(self.size);
+        if coord.0 < 0. {
+            coord.0 = 0.;
+        } else if coord.0 > self.sizef {
+            coord.0 = self.sizef;
         }
 
-        if coord.y() < 0. {
-            coord.set_y(0.);
-        } else if coord.y() > self.size {
-            coord.set_y(self.size);
+        if coord.1 < 0. {
+            coord.1 = 0.;
+        } else if coord.1 > self.sizef {
+            coord.1 = self.sizef;
         }
+
+        *self.coord_mut(index) = coord;
     }
 
     pub fn remove(&mut self, index: usize) {
@@ -114,7 +131,7 @@ impl Direction {
         }
     }
 
-    pub fn as_rad(&self) -> f32 {
+    pub fn as_rad(self) -> f32 {
         self.0
     }
 }
@@ -145,16 +162,8 @@ impl Coordinate {
         self.0
     }
 
-    pub fn set_x(&mut self, x: f32) {
-        self.0 = x;
-    }
-
     pub fn y(self) -> f32 {
         self.1
-    }
-
-    pub fn set_y(&mut self, y: f32) {
-        self.0 = y;
     }
 
     pub fn max(self) -> f32 {
@@ -175,8 +184,8 @@ impl Coordinate {
     }
 
     pub fn translate(&mut self, dir: Direction, amount: f32) {
-        self.0 *= dir.0.cos() * amount;
-        self.1 *= dir.0.sin() * amount;
+        self.0 += dir.0.cos() * amount;
+        self.1 += dir.0.sin() * amount;
     }
 
     pub fn distance(self, rhs: Self) -> f32 {

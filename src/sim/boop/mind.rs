@@ -1,4 +1,4 @@
-use super::super::{Direction, Index, Simulation};
+use super::super::{Index, Simulation};
 use crate::neural::{Stimulus, Synapse};
 
 use crate::build_vec;
@@ -34,7 +34,7 @@ impl Mind {
             .stimuli(|input| input.sense(simulation, index))
             .into_iter()
             .filter_map(|(out, stim)| out.spike(stim))
-            .for_each(|out| out.act(simulation, index));
+            .for_each(|(out, stim)| out.act(simulation, index, stim));
     }
 
     #[inline]
@@ -193,16 +193,12 @@ impl Input {
     fn sense(self, simulation: &Simulation, index: Index) -> Stimulus {
         match self {
             Self::Random => Stimulus::cap(rand::random::<f32>()),
-            Self::DirectionVertical => match simulation.boop(index).direction() {
-                Direction::East | Direction::West => Stimulus::half(),
-                Direction::North => true.into(),
-                Direction::South => false.into(),
-            },
-            Self::DirectionHorizontal => match simulation.boop(index).direction() {
-                Direction::North | Direction::South => Stimulus::half(),
-                Direction::East => true.into(),
-                Direction::West => false.into(),
-            },
+            Self::DirectionVertical => {
+                Stimulus::cap(simulation.boop(index).direction().as_rad().sin() + 1. / 2.)
+            }
+            Self::DirectionHorizontal => {
+                Stimulus::cap(simulation.boop(index).direction().as_rad().cos() + 1. / 2.)
+            }
         }
     }
 }
@@ -224,30 +220,26 @@ impl Output {
         }
     }
 
-    fn spike(self, stimulus: Stimulus) -> Option<Self> {
+    fn spike(self, stimulus: Stimulus) -> Option<(Self, Stimulus)> {
         match self {
-            Self::TurnLeft | Self::TurnRight | Self::Advance => {
-                if rand::random::<f32>() < stimulus.as_f32() {
-                    Some(self)
-                } else {
-                    None
-                }
-            }
+            Self::TurnLeft | Self::TurnRight | Self::Advance => Some((self, stimulus)),
             Self::Noop => None,
         }
     }
 
-    fn act(self, simulation: &mut Simulation, index: Index) {
+    fn act(self, simulation: &mut Simulation, index: Index, stimulus: Stimulus) {
         match self {
             Self::TurnLeft => {
-                simulation.boop_mut(index).turn_left();
+                simulation.boop_mut(index).turn_left(stimulus.as_f32());
             }
             Self::TurnRight => {
-                simulation.boop_mut(index).turn_right();
+                simulation.boop_mut(index).turn_right(stimulus.as_f32());
             }
             Self::Advance => {
                 let direction = simulation.boop(index).direction();
-                simulation.world.advance(index, direction);
+                simulation
+                    .world
+                    .advance(index, stimulus.as_f32(), direction);
             }
             Self::Noop => {}
         }
