@@ -48,52 +48,9 @@ impl World {
     }
 
     pub fn advance(&mut self, index: Index, speed: f32, direction: Direction) {
-        const SIXTY: f32 = std::f32::consts::FRAC_PI_3;
-        const ONE_TWENTY: f32 = 2. * std::f32::consts::FRAC_PI_3;
-
         let mut coord = self.coord(index);
 
-        if let Some((neighbor, mut dist)) = self
-            .coord
-            .iter()
-            .filter_map(|c| {
-                // ALLOWED: So that we can comment the steps
-                #[allow(clippy::if_same_then_else)]
-                if *c == coord {
-                    // Skip self
-                    None
-                } else if Direction::new(SIXTY + c.dir_from(coord).0 - direction.0).0 > ONE_TWENTY {
-                    // TODO: Instead of a 120deg angle, maybe cast a rays for each side of the body
-                    // Skip if not within 60 degrees from `direction`
-                    None
-                } else {
-                    // Only if close enough to collide
-                    let dist = c.distance(coord);
-                    if dist < speed + 1. {
-                        Some((c, dist - 1.))
-                    } else {
-                        None
-                    }
-                }
-            })
-            .fold(None, |acc, (cc, cd)| {
-                if let Some((ac, ad)) = acc {
-                    if ad < cd {
-                        return Some((ac, ad));
-                    }
-                }
-                Some((cc, cd))
-            })
-        {
-            let mut prev = f32::MAX;
-            while dist > 0.01 && dist < prev {
-                coord.translate(direction, dist);
-                prev = dist;
-                dist = neighbor.distance(coord) - 1.;
-            }
-        } else {
-            coord.translate(direction, speed);
-        }
+        coord.translate(direction, speed);
 
         // TODO: These walls allow boops to go on top of each other by sliding
         if coord.0 < 0. {
