@@ -11,11 +11,11 @@ impl Quad {
 }
 
 impl Engine for Quad {
-    fn start(self, mut simulation: Simulation) {
+    fn start(self, mut simulation: Simulation, days: usize) {
         macroquad::Window::from_config(self.0, async move {
             let mut gen = 0_usize;
             loop {
-                for day in 0..256 {
+                for day in 0..days {
                     if macroquad::input::is_key_down(macroquad::input::KeyCode::Escape) {
                         return;
                     }

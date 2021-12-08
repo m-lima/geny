@@ -25,6 +25,11 @@ fn main() -> anyhow::Result<()> {
         .ok_or(anyhow::anyhow!("No being count provided"))?
         .parse()?;
 
+    let days = args
+        .next()
+        .ok_or(anyhow::anyhow!("No days per generation provided"))?
+        .parse()?;
+
     let synapses = args
         .next()
         .ok_or(anyhow::anyhow!("No synapse count provided"))?
@@ -42,7 +47,7 @@ fn main() -> anyhow::Result<()> {
     if terminal {
         use engine::Engine;
         let terminal = engine::Terminal::<true, true>;
-        terminal.start(simulation);
+        terminal.start(simulation, days);
     } else {
         use engine::Engine;
         let quad = engine::Quad::new(macroquad::window::Conf {
@@ -52,7 +57,7 @@ fn main() -> anyhow::Result<()> {
             window_resizable: false,
             ..macroquad::window::Conf::default()
         });
-        quad.start(simulation);
+        quad.start(simulation, days);
     }
 
     Ok(())

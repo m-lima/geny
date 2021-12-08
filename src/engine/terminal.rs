@@ -4,10 +4,10 @@ use crate::sim::Simulation;
 pub struct Terminal<const BORDER: bool, const CLEAR: bool>;
 
 impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
-    fn start(self, mut simulation: Simulation) {
+    fn start(self, mut simulation: Simulation, days: usize) {
         let mut gen = 0_usize;
         loop {
-            for day in 0..256 {
+            for day in 0..days {
                 simulation.step();
                 render::<BORDER, CLEAR>(&simulation, gen, day);
             }

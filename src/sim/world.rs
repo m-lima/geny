@@ -190,7 +190,11 @@ mod test {
     #[test]
     fn dir_from() {
         let c1 = Coordinate(0., 0.);
-        assert!(Coordinate(1., 0.).dir_from(c1) == Direction(0.),);
-        assert!(Coordinate(0., 1.).dir_from(c1) == Direction(0.),);
+        assert!(Coordinate(1., 0.).dir_from(c1) == Direction(0.));
+        assert!(Coordinate(0., 1.).dir_from(c1) == Direction(std::f32::consts::FRAC_PI_2));
+        assert!(
+            Coordinate(0., 1.).dir_from(c1) - Direction(std::f32::consts::FRAC_PI_2)
+                == Direction(0.)
+        );
     }
 }

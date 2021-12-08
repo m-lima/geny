@@ -8,5 +8,5 @@ mod quad;
 pub use quad::Quad;
 
 pub trait Engine {
-    fn start(self, simulation: Simulation);
+    fn start(self, simulation: Simulation, days: usize);
 }
