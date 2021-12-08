@@ -1,23 +1,34 @@
 use super::Engine;
 use crate::sim::Simulation;
 
-pub struct Terminal<const BORDER: bool>;
+pub struct Terminal<const BORDER: bool, const CLEAR: bool>;
 
-impl<const BORDER: bool> Engine for Terminal<BORDER> {
+impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
     fn start(self, mut simulation: Simulation) {
-        let mut day = 0_usize;
-        while simulation.step() {
-            println!("[67A");
-            println!("[68ADay: [37m{}[m", day);
-            render::<BORDER>(&simulation);
-            day += 1;
+        let mut gen = 0_usize;
+        loop {
+            for day in 0..256 {
+                simulation.step();
+                render::<BORDER, CLEAR>(&simulation, gen, day);
+            }
+            gen += 1;
+            if !simulation.next_generation() {
+                break;
+            }
         }
     }
 }
 
 // ALLOWED: Makes it easier to read
 #[allow(clippy::non_ascii_literal)]
-fn render<const BORDER: bool>(simulation: &Simulation) {
+fn render<const BORDER: bool, const CLEAR: bool>(simulation: &Simulation, gen: usize, day: usize) {
+    if CLEAR {
+        println!("[67A");
+        println!("[68AGeneration: [37m{}[m Day: [37m{}[m", gen, day);
+    } else {
+        println!("Generation: [37m{}[m Day: [37m{}[m", gen, day);
+    }
+
     if BORDER {
         print!("┏");
         for _ in 0..simulation.size() << 1 {

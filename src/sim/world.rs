@@ -1,9 +1,12 @@
 use super::Index;
 
+use crate::build_vec;
+
 pub struct World {
     size: u8,
     sizef: f32,
-    coord: Vec<Coordinate>,
+    boops: Vec<Coordinate>,
+    food: Vec<Coordinate>,
     // Walls
     // Foods
     // Lava
@@ -11,24 +14,19 @@ pub struct World {
 }
 
 impl World {
-    #[inline]
-    pub fn new(size: u8, count: u16) -> Self {
-        use rand::seq::IteratorRandom;
-
-        let count = count.min(u16::from(size) * u16::from(size));
-
-        let coord = (0..size)
-            .flat_map(|x| {
-                (0..size)
-                    .map(|y| Coordinate::new(f32::from(x), f32::from(y)))
-                    .collect::<Vec<_>>()
-            })
-            .choose_multiple(&mut rand::thread_rng(), count as usize);
-
+    pub fn new(size: u8, count: usize, food_count: usize) -> Self {
+        let sizef = f32::from(size - 1);
         Self {
             size,
-            sizef: f32::from(size - 1),
-            coord,
+            sizef,
+            boops: build_vec!(
+                || Coordinate::new(rand::random::<f32>() * sizef, rand::random::<f32>() * sizef,),
+                count
+            ),
+            food: build_vec!(
+                || Coordinate::new(rand::random::<f32>() * sizef, rand::random::<f32>() * sizef,),
+                food_count
+            ),
         }
     }
 
@@ -38,21 +36,34 @@ impl World {
     }
 
     #[inline]
-    pub fn coord(&self, index: Index) -> Coordinate {
-        unsafe { *self.coord.get_unchecked(index.0) }
+    pub fn boop(&self, index: Index) -> Coordinate {
+        unsafe { *self.boops.get_unchecked(index.0) }
     }
 
     #[inline]
-    fn coord_mut(&mut self, index: Index) -> &mut Coordinate {
-        unsafe { self.coord.get_unchecked_mut(index.0) }
+    fn boop_mut(&mut self, index: Index) -> &mut Coordinate {
+        unsafe { self.boops.get_unchecked_mut(index.0) }
+    }
+
+    #[inline]
+    pub fn fodder(&self) -> impl Iterator<Item = &Coordinate> {
+        self.food.iter()
+    }
+
+    pub fn on_food(&mut self, index: Index) -> bool {
+        for food in &self.food {
+            if food.distance(self.boop(index)) < 1. {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn advance(&mut self, index: Index, speed: f32, direction: Direction) {
-        let mut coord = self.coord(index);
+        let mut coord = self.boop(index);
 
         coord.translate(direction, speed);
 
-        // TODO: These walls allow boops to go on top of each other by sliding
         if coord.0 < 0. {
             coord.0 = 0.;
         } else if coord.0 > self.sizef {
@@ -65,11 +76,7 @@ impl World {
             coord.1 = self.sizef;
         }
 
-        *self.coord_mut(index) = coord;
-    }
-
-    pub fn remove(&mut self, index: usize) {
-        self.coord.swap_remove(index);
+        *self.boop_mut(index) = coord;
     }
 }
 
@@ -77,10 +84,8 @@ impl World {
 pub struct Direction(f32);
 
 impl Direction {
-    pub fn new(rads: f32) -> Self {
-        let mut this = Self(rads);
-        this.desaturate();
-        this
+    pub fn random() -> Self {
+        Self(rand::random::<f32>() * std::f32::consts::TAU)
     }
 
     fn desaturate(&mut self) {
@@ -115,6 +120,16 @@ impl std::ops::SubAssign<f32> for Direction {
     }
 }
 
+impl std::ops::Sub for Direction {
+    type Output = Self;
+
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self.0 -= rhs.0;
+        self.desaturate();
+        self
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Coordinate(f32, f32);
 
@@ -129,18 +144,6 @@ impl Coordinate {
 
     pub fn y(self) -> f32 {
         self.1
-    }
-
-    pub fn max(self) -> f32 {
-        self.0.max(self.1)
-    }
-
-    pub fn min(self) -> f32 {
-        self.0.min(self.1)
-    }
-
-    pub fn abs(self) -> Self {
-        Self(self.0.abs(), self.1.abs())
     }
 
     pub fn dir_from(self, rhs: Self) -> Direction {

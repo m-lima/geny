@@ -58,12 +58,11 @@ impl Genome {
         self.0.iter().fold(0, |a, c| a ^ c.0)
     }
 
-    pub fn combine(father: &Self, mother: &Self) -> Self {
+    pub fn combine(&self, other: &Self) -> Self {
         Self(
-            father
-                .0
+            self.0
                 .iter()
-                .zip(mother.0.iter())
+                .zip(other.0.iter())
                 .map(|(f, m)| if rand::random() { f } else { m })
                 .copied()
                 .collect(),
@@ -150,13 +149,13 @@ impl Gene {
         // ALLOWED: Mantissa is 23 bits, this is only 18
         #[allow(clippy::cast_precision_loss)]
         // 20 bits set to `1`
-        // Divided by four
-        const REFERENCE: f32 = ((1_u32 << 18) - 1) as f32;
+        // Divided by eight
+        const REFERENCE: f32 = ((1_u32 << 17) - 1) as f32;
 
         // ALLOWED: Mantissa is 23 bits, this is only 20
         #[allow(clippy::cast_precision_loss)]
-        // REFERENCE is divided by 4 so that we ultimately multiply `weight` by 4
-        let synapse = (self.0 & Self::TWENTY_BITS) as f32 / REFERENCE;
+        // REFERENCE is divided by 8 so that we ultimately multiply `weight` by 8
+        let synapse = (self.0 & Self::TWENTY_BITS) as f32 / REFERENCE - 4.;
 
         let (conn_type, input, output) = Self::dissect(self.0);
 
@@ -174,10 +173,17 @@ impl Gene {
     }
 }
 
+// ALLOWED: It's the AI that uses it
+#[allow(dead_code)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 enum Input {
-    DirectionVertical,
-    DirectionHorizontal,
+    // TODO: Make `direction` a single input
+    Direction,
+    // DirectionVertical,
+    // DirectionHorizontal,
+    FoodDirection,
+    FoodDistance,
+    Unit,
     Random,
 }
 
@@ -192,17 +198,62 @@ impl Input {
 
     fn sense(self, simulation: &Simulation, index: Index) -> Stimulus {
         match self {
+            Self::Direction => {
+                Stimulus::cap(simulation.boop(index).direction().as_rad() / std::f32::consts::TAU)
+            }
+            // Self::DirectionVertical => {
+            //     Stimulus::cap(simulation.boop(index).direction().as_rad().sin() + 1. / 2.)
+            // }
+            // Self::DirectionHorizontal => {
+            //     Stimulus::cap(simulation.boop(index).direction().as_rad().cos() + 1. / 2.)
+            // }
+            Self::FoodDirection => {
+                let boop = simulation.boop(index);
+                let coord = simulation.world.boop(index);
+                let mut food = simulation
+                    .fodder()
+                    .map(|f| (f, f.distance(coord)))
+                    // .filter_map(|f| {
+                    //     let d = f.distance(coord);
+                    //     if d <= 10. {
+                    //         Some((f, d))
+                    //     } else {
+                    //         None
+                    //     }
+                    // })
+                    .collect::<Vec<_>>();
+                food.sort_unstable_by(|(_, d1), (_, d2)| {
+                    d1.partial_cmp(d2).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                if let Some((f, _)) = food.first() {
+                    Stimulus::cap(
+                        (f.dir_from(coord) - boop.direction()).as_rad() / std::f32::consts::TAU,
+                    )
+                } else {
+                    Stimulus::from(false)
+                }
+            }
+            Self::FoodDistance => {
+                let coord = simulation.world.boop(index);
+                let mut food = simulation
+                    .fodder()
+                    .map(|f| f.distance(coord))
+                    .collect::<Vec<_>>();
+                food.sort_unstable_by(|d1, d2| {
+                    d1.partial_cmp(d2).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                food.first().map_or(Stimulus::from(false), |d| {
+                    Stimulus::cap(*d / f32::from(simulation.size()))
+                })
+            }
+            Self::Unit => Stimulus::from(true),
             Self::Random => Stimulus::cap(rand::random::<f32>()),
-            Self::DirectionVertical => {
-                Stimulus::cap(simulation.boop(index).direction().as_rad().sin() + 1. / 2.)
-            }
-            Self::DirectionHorizontal => {
-                Stimulus::cap(simulation.boop(index).direction().as_rad().cos() + 1. / 2.)
-            }
         }
     }
 }
 
+// ALLOWED: It's the AI that uses it
+#[allow(dead_code)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 enum Output {
     TurnLeft,

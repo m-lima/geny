@@ -41,14 +41,14 @@ fn main() -> anyhow::Result<()> {
 
     if terminal {
         use engine::Engine;
-        let terminal = engine::Terminal::<true>;
+        let terminal = engine::Terminal::<true, true>;
         terminal.start(simulation);
     } else {
         use engine::Engine;
         let quad = engine::Quad::new(macroquad::window::Conf {
             window_title: String::from("Geny"),
-            window_width: 1024,
-            window_height: 1024,
+            window_width: 800,
+            window_height: 800,
             window_resizable: false,
             ..macroquad::window::Conf::default()
         });

@@ -26,6 +26,18 @@ impl Boop {
     pub fn mind_mut(&mut self) -> &mut Mind {
         &mut self.mind
     }
+
+    #[inline]
+    pub fn mate(&self, mate: &Self, mutability: f32, hidden_neurons: u8) -> Self {
+        let mut spawn = self.mind.genome().combine(mate.mind.genome());
+        if rand::random::<f32>() < mutability {
+            spawn.mutate(hidden_neurons);
+        }
+        Self {
+            mind: Mind::from(spawn),
+            body: Body::new(),
+        }
+    }
 }
 
 impl std::ops::Deref for Boop {

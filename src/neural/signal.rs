@@ -3,10 +3,6 @@
 pub struct Signal(f32);
 
 impl Signal {
-    pub fn half() -> Self {
-        Self(0.5)
-    }
-
     pub fn cap(value: f32) -> Self {
         Self(value.min(1.).max(0.))
     }
@@ -40,11 +36,6 @@ pub struct Amplifier(f32);
 impl Amplifier {
     pub fn new(value: f32) -> Self {
         Self(value.min(4.).max(-4.))
-    }
-
-    #[inline]
-    pub fn as_f32(self) -> f32 {
-        self.0
     }
 }
 

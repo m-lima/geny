@@ -11,52 +11,60 @@ use crate::build_vec;
 pub struct Simulation {
     world: World,
     boops: Vec<Boop>,
+    hidden_neurons: u8,
 }
 
 impl Simulation {
-    pub fn new(size: u8, boops: u16, synapses: u16, hidden_neurons: u8) -> Self {
+    pub fn new(size: u8, boops: usize, synapses: u16, hidden_neurons: u8) -> Self {
         Self {
-            world: World::new(size, boops),
+            world: World::new(size, boops, 4),
             boops: build_vec!(|| Boop::new(synapses, hidden_neurons), boops),
+            hidden_neurons,
         }
     }
 
-    pub fn step(&mut self) -> bool {
+    pub fn step(&mut self) {
         // TODO: The sequence of actions may interfer with each other
         for index in 0..self.boops.len() {
-            let boop = self.boop_mut(Index(index));
-            boop.tick();
-
             // TODO: If an action kills, this loop must be careful
             // SAFETY: `boop` does not get moved or dropped
             let boop: *mut Boop = self.boop_mut(Index(index));
             unsafe { (*boop).mind_mut().react(self, Index(index)) };
         }
-
-        self.reap()
     }
 
-    fn reap(&mut self) -> bool {
-        let mut i = 0;
-        loop {
-            if i == self.boops.len() {
-                break;
-            }
+    pub fn next_generation(&mut self) -> bool {
+        use rand::seq::SliceRandom;
 
-            let dead = {
-                let boop = self.boop(Index(i));
-                boop.age() == 255 || boop.hunger() == 255
-            };
+        let count = self.boops.len();
 
-            if dead {
-                self.boops.swap_remove(i);
-                self.world.remove(i);
-            } else {
-                i += 1;
-            }
+        let mut survivors = (0..count)
+            .filter(|i| self.world.on_food(Index(*i)))
+            .collect::<Vec<_>>();
+
+        if survivors.is_empty() {
+            return false;
         }
 
-        !self.boops.is_empty()
+        let mut rng = rand::thread_rng();
+        survivors.shuffle(&mut rng);
+
+        let mut spawn = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            let father = *survivors.choose(&mut rng).unwrap();
+            let mother = *survivors.choose(&mut rng).unwrap();
+
+            spawn.push(self.boop(Index(father)).mate(
+                self.boop(Index(mother)),
+                0.001,
+                self.hidden_neurons,
+            ));
+        }
+
+        self.world = World::new(self.size(), count, 4);
+        self.boops = spawn;
+        true
     }
 
     #[inline]
@@ -64,11 +72,16 @@ impl Simulation {
         self.world.size()
     }
 
+    #[inline]
+    pub fn fodder(&self) -> impl Iterator<Item = &Coordinate> {
+        self.world.fodder()
+    }
+
     pub fn boops(&self) -> impl Iterator<Item = Accessor<'_>> {
         self.boops
             .iter()
             .enumerate()
-            .map(|(i, b)| Accessor(b, self.world.coord(Index(i))))
+            .map(|(i, b)| Accessor(b, self.world.boop(Index(i))))
     }
 
     #[inline]
