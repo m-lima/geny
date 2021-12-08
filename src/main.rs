@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![deny(warnings, clippy::pedantic, rust_2018_idioms, rust_2021_compatibility)]
 
 #[macro_export]
 macro_rules! build_vec {
