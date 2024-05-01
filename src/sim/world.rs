@@ -1,7 +1,5 @@
 use super::Index;
 
-use crate::build_vec;
-
 pub struct World {
     size: u8,
     sizef: f32,
@@ -62,19 +60,7 @@ impl World {
     pub fn advance(&mut self, index: Index, speed: f32, direction: Direction) {
         let mut coord = self.boop(index);
 
-        coord.translate(direction, speed);
-
-        if coord.0 < 0. {
-            coord.0 = 0.;
-        } else if coord.0 > self.sizef {
-            coord.0 = self.sizef;
-        }
-
-        if coord.1 < 0. {
-            coord.1 = 0.;
-        } else if coord.1 > self.sizef {
-            coord.1 = self.sizef;
-        }
+        coord.translate(direction, speed, self.sizef);
 
         *self.boop_mut(index) = coord;
     }
@@ -146,14 +132,29 @@ impl Coordinate {
         self.1
     }
 
+    // ALLOWED: Coord is never negative or out of bounds, due to `translate`
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    pub fn x_index(self) -> u8 {
+        self.0 as u8
+    }
+
+    // ALLOWED: Coord is never negative or out of bounds, due to `translate`
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    pub fn y_index(self) -> u8 {
+        self.1 as u8
+    }
+
     pub fn dir_from(self, rhs: Self) -> Direction {
         let vec = self - rhs;
         Direction(vec.1.atan2(vec.0))
     }
 
-    pub fn translate(&mut self, dir: Direction, amount: f32) {
+    fn translate(&mut self, dir: Direction, amount: f32, max: f32) {
         self.0 += dir.0.cos() * amount;
         self.1 += dir.0.sin() * amount;
+
+        self.0 = self.0.clamp(0.0, max);
+        self.1 = self.1.clamp(0.0, max);
     }
 
     pub fn distance(self, rhs: Self) -> f32 {

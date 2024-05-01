@@ -96,13 +96,9 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
                     synapse,
                 } => {
                     let hiddens: *mut Vec<Hidden> = &mut hiddens;
-                    Self::make_synapse(
-                        input,
-                        output,
-                        synapse,
-                        unsafe { hiddens.as_mut().unwrap() },
-                        unsafe { hiddens.as_mut().unwrap() },
-                    );
+                    Self::make_synapse(input, output, synapse, unsafe { &mut *hiddens }, unsafe {
+                        &mut *hiddens
+                    });
                 }
                 Axon::FromHidden {
                     input,
@@ -128,8 +124,6 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
         inputs: &mut Vec<NIn>,
         outputs: &mut Vec<NOut>,
     ) {
-        // ALLOWED: We need to mutate `inputs` in the else case
-        #[allow(clippy::option_if_let_else)]
         let input_index = if let Some(idx) = inputs
             .iter()
             .enumerate()
@@ -190,16 +184,16 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
             // SAFETY: References are never out of bounds
             let neuron: *mut Hidden = unsafe { hiddens.get_unchecked_mut(neuron_ref.index) };
             // SAFETY: Safe because we never modify the list nor do we revisit a node
-            unsafe {
-                if (*neuron).visit() {
-                    (*neuron).latch(signal::aggregate(
-                        (*neuron)
-                            .dentrites()
-                            .map(|d| d.synapse * Self::update(inputs, hiddens, d.neuron, input)),
-                    ));
-                }
-                (*neuron).latched()
+            let neuron = unsafe { &mut *neuron };
+
+            if neuron.visit() {
+                neuron.latch(signal::aggregate(
+                    neuron
+                        .dentrites()
+                        .map(|d| d.synapse * Self::update(inputs, hiddens, d.neuron, input)),
+                ));
             }
+            neuron.latched()
         } else {
             // SAFETY: References are never out of bounds
             let neuron = unsafe { inputs.get_unchecked_mut(neuron_ref.index) };

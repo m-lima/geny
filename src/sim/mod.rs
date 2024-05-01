@@ -6,8 +6,6 @@ use world::World;
 
 pub use world::{Coordinate, Direction};
 
-use crate::build_vec;
-
 pub struct Simulation {
     world: World,
     boops: Vec<Boop>,

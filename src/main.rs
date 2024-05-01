@@ -1,10 +1,16 @@
 #![deny(warnings, clippy::pedantic, rust_2018_idioms, rust_2021_compatibility)]
 
-#[macro_export]
 macro_rules! build_vec {
     ($builder:expr, $size:expr) => {{
         let builder = $builder;
         (0..$size).map(|_| builder()).collect()
+    }};
+}
+
+macro_rules! truncate {
+    (u32 -> u8, $value: expr) => {{
+        let value: u32 = $value;
+        value as u8
     }};
 }
 

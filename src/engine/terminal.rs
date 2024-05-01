@@ -6,10 +6,13 @@ pub struct Terminal<const BORDER: bool, const CLEAR: bool>;
 impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
     fn start(self, mut simulation: Simulation, days: usize) {
         let mut gen = 0_usize;
+
+        let mut buffer = vec![vec![None; simulation.size() as usize]; simulation.size() as usize];
+
         loop {
             for day in 0..days {
                 simulation.step();
-                render::<BORDER, CLEAR>(&simulation, gen, day);
+                render::<BORDER, CLEAR>(&simulation, gen, day, &mut buffer);
             }
             gen += 1;
             if !simulation.next_generation() {
@@ -19,31 +22,33 @@ impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
     }
 }
 
-// ALLOWED: Makes it easier to read
-#[allow(clippy::non_ascii_literal)]
-fn render<const BORDER: bool, const CLEAR: bool>(simulation: &Simulation, gen: usize, day: usize) {
+fn render<const BORDER: bool, const CLEAR: bool>(
+    simulation: &Simulation,
+    gen: usize,
+    day: usize,
+    buffer: &mut Vec<Vec<Option<(char, u32)>>>,
+) {
+    use std::io::Write;
+
+    let mut stdout = std::io::stdout().lock();
+
     if CLEAR {
-        println!("[67A");
-        println!("[68AGeneration: [37m{}[m Day: [37m{}[m", gen, day);
+        let height = simulation.size() + 1 + if BORDER { 2 } else { 0 };
+        let _ = writeln!(stdout, "[{height}AGeneration: [37m{gen}[m Day: [37m{day}[m");
     } else {
-        println!("Generation: [37m{}[m Day: [37m{}[m", gen, day);
+        let _ = writeln!(stdout, "Generation: [37m{gen}[m Day: [37m{day}[m");
     }
 
     if BORDER {
-        print!("┏");
+        let _ = write!(stdout, "┏");
         for _ in 0..simulation.size() << 1 {
-            print!("━");
+            let _ = write!(stdout, "━");
         }
-        println!("┓");
+        let _ = writeln!(stdout, "┓");
     }
 
-    let mut buffer = vec![
-        vec![Option::<(char, u32)>::None; simulation.size() as usize];
-        simulation.size() as usize
-    ];
+    buffer.iter_mut().flatten().for_each(|c| *c = None);
 
-    // ALLOWED: Coord is never negative or out of bounds, due to `World::advance`
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     for boop in simulation.boops() {
         let coord = boop.coordinate();
         let direction = {
@@ -61,12 +66,18 @@ fn render<const BORDER: bool, const CLEAR: bool>(simulation: &Simulation, gen: u
             }
         };
         let signature = boop.signature();
-        buffer[coord.y() as usize][coord.x() as usize] = Some((direction, signature));
+
+        // SAFETY: Coordinate is always in the 0..size range
+        unsafe {
+            *buffer
+                .get_unchecked_mut(usize::from(coord.y_index()))
+                .get_unchecked_mut(usize::from(coord.x_index())) = Some((direction, signature));
+        }
     }
 
     for row in buffer {
         if BORDER {
-            print!("│");
+            print!("┃");
         }
 
         for cell in row {
@@ -77,17 +88,10 @@ fn render<const BORDER: bool, const CLEAR: bool>(simulation: &Simulation, gen: u
                 signature >>= 8;
                 let r = signature & 0xff;
                 print!(
-                    "[48;2;{};{};{}m[38;2;{};{};{}m{}[38;2;{};{};{}m\u{2588}[m",
-                    r,
-                    g,
-                    b,
+                    "[48;2;{r};{g};{b}m[38;2;{};{};{}m{direction}[38;2;{r};{g};{b}m\u{2588}[m",
                     !r & 0xff,
                     !g & 0xff,
                     !b & 0xff,
-                    direction,
-                    r,
-                    g,
-                    b
                 );
             } else {
                 print!("  ");
@@ -95,18 +99,18 @@ fn render<const BORDER: bool, const CLEAR: bool>(simulation: &Simulation, gen: u
         }
 
         if BORDER {
-            println!("│");
+            let _ = writeln!(stdout, "┃");
         } else {
-            println!();
+            let _ = writeln!(stdout);
         }
     }
 
     if BORDER {
-        print!("┗");
+        let _ = write!(stdout, "┗");
         for _ in 0..simulation.size() << 1 {
-            print!("━");
+            let _ = write!(stdout, "━");
         }
-        print!("┛");
+        let _ = write!(stdout, "┛");
     }
-    println!();
+    let _ = writeln!(stdout);
 }

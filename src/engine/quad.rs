@@ -49,7 +49,7 @@ fn render(simulation: &Simulation, gen: usize, day: usize) {
         macroquad::color::Color::from_rgba(22, 22, 22, 255),
     );
     macroquad::text::draw_text(
-        &format!("Generation: {} Day: {}", gen, day),
+        &format!("Generation: {gen} Day: {day}"),
         2.,
         14.,
         24.,
@@ -82,13 +82,11 @@ fn render(simulation: &Simulation, gen: usize, day: usize) {
 }
 
 fn signature_to_color(mut signature: u32) -> macroquad::color::Color {
-    let b = signature & 0xff;
+    let b = truncate!(u32 -> u8, signature & 0xff);
     signature >>= 8;
-    let g = signature & 0xff;
+    let g = truncate!(u32 -> u8, signature & 0xff);
     signature >>= 8;
-    let r = signature & 0xff;
+    let r = truncate!(u32 -> u8, signature & 0xff);
 
-    // ALLOWED: The above bitmasks clamp the value already
-    #[allow(clippy::cast_possible_truncation)]
-    macroquad::color::Color::from_rgba(r as u8, g as u8, b as u8, 0xff)
+    macroquad::color::Color::from_rgba(r, g, b, 0xff)
 }

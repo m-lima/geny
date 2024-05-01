@@ -1,8 +1,6 @@
 use super::super::{Index, Simulation};
 use crate::neural::{Stimulus, Synapse};
 
-use crate::build_vec;
-
 type Brain = super::super::super::neural::Brain<Input, Output, 8>;
 type Axon = super::super::super::neural::Axon<Input, Output, 8>;
 
@@ -78,7 +76,7 @@ impl Genome {
     }
 
     fn build(&self) -> Brain {
-        Brain::new(self.0.iter().map(Gene::build))
+        Brain::new(self.0.iter().copied().map(Gene::build))
     }
 }
 
@@ -124,28 +122,22 @@ impl Gene {
         Self::new(self.0 ^ bit, hidden_neurons)
     }
 
-    // ALLOWED: The bitmask asserts proper range
-    #[allow(clippy::cast_possible_truncation)]
     #[inline]
     fn dissect(mut gene: u32) -> (u8, u8, u8) {
         gene >>= 20;
 
-        let output = gene as u8 & 0b1_1111;
+        let output = truncate!(u32 -> u8, gene & 0b1_1111);
         gene >>= 5;
 
-        let input = gene as u8 & 0b1_1111;
+        let input = truncate!(u32 -> u8, gene & 0b1_1111);
         gene >>= 5;
 
-        let conn_type = gene as u8 & 0b11;
+        let conn_type = truncate!(u32 -> u8, gene & 0b11);
 
         (conn_type, input, output)
     }
 
-    // TODO: Test similarity (weigth < input < output < type)
-    // ALLOWED: Makes for better chaining in `Genome::build`. (Either the ref happens in the
-    // closure or here.. So..
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn build(&self) -> Axon {
+    fn build(self) -> Axon {
         // ALLOWED: Mantissa is 23 bits, this is only 18
         #[allow(clippy::cast_precision_loss)]
         // 20 bits set to `1`
@@ -165,15 +157,15 @@ impl Gene {
                 Output::from(output),
                 Synapse::new(synapse),
             ),
-            1 => Axon::into_hidden(Input::from(input), output as u8, Synapse::new(synapse)),
-            2 => Axon::inter_hidden(input, output as u8, Synapse::new(synapse)),
+            1 => Axon::into_hidden(Input::from(input), output, Synapse::new(synapse)),
+            2 => Axon::inter_hidden(input, output, Synapse::new(synapse)),
             3 => Axon::from_hidden(input, Output::from(output), Synapse::new(synapse)),
             _ => unreachable!(),
         }
     }
 }
 
-// ALLOWED: It's the AI that uses it
+// ALLOWED: Input::from() may build this
 #[allow(dead_code)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 enum Input {
@@ -190,10 +182,7 @@ enum Input {
 impl Input {
     fn from(index: u8) -> Self {
         // SAFETY: This private method is only called by a `Gene`
-        #[allow(clippy::cast_possible_truncation)]
-        unsafe {
-            std::mem::transmute::<u8, Self>(index)
-        }
+        unsafe { std::mem::transmute::<u8, Self>(index) }
     }
 
     fn sense(self, simulation: &Simulation, index: Index) -> Stimulus {
@@ -252,7 +241,7 @@ impl Input {
     }
 }
 
-// ALLOWED: It's the AI that uses it
+// ALLOWED: Output::from() may build this
 #[allow(dead_code)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 enum Output {
@@ -265,10 +254,7 @@ enum Output {
 impl Output {
     fn from(index: u8) -> Self {
         // SAFETY: This private method is only called by a `Gene`
-        #[allow(clippy::cast_possible_truncation)]
-        unsafe {
-            std::mem::transmute::<u8, Self>(index)
-        }
+        unsafe { std::mem::transmute::<u8, Self>(index) }
     }
 
     fn spike(self, stimulus: Stimulus) -> Option<(Self, Stimulus)> {
