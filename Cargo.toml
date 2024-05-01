@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.45"
-macroquad = "0.3.10"
-rand = "0.8.4"
+anyhow = "1.0.82"
+macroquad = "0.4.5"
+rand = "0.8.5"
