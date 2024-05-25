@@ -9,14 +9,16 @@ pub use world::{Coordinate, Direction};
 pub struct Simulation {
     world: World,
     boops: Vec<Boop>,
+    synapses: u16,
     hidden_neurons: u8,
 }
 
 impl Simulation {
     pub fn new(size: u8, boops: usize, synapses: u16, hidden_neurons: u8) -> Self {
         Self {
-            world: World::new(size, boops, 4),
+            world: World::new(size, boops, 5),
             boops: build_vec!(|| Boop::new(synapses, hidden_neurons), boops),
+            synapses,
             hidden_neurons,
         }
     }
@@ -24,11 +26,58 @@ impl Simulation {
     pub fn step(&mut self) {
         // TODO: The sequence of actions may interfer with each other
         for index in 0..self.boops.len() {
+            let index = Index(index);
             // TODO: If an action kills, this loop must be careful
             // SAFETY: `boop` does not get moved or dropped
-            let boop: *mut Boop = self.boop_mut(Index(index));
-            unsafe { (*boop).mind_mut().react(self, Index(index)) };
+            let boop = unsafe { &mut *(self.boop_mut(index) as *mut Boop) };
+            boop.mind_mut().react(self, index);
+            if let Some(energy) = self.world.eat(index) {
+                boop.restore_energy(energy);
+            } else {
+                boop.drain(2.0);
+                if boop.energy() <= 0.0 {
+                    use rand::seq::SliceRandom;
+
+                    // let mut parents = (0..len).map(Index).collect::<Vec<_>>();
+                    // parents.sort_unstable_by(|a, b| {
+                    //     let a = self.boop(*a).energy();
+                    //     let b = self.boop(*b).energy();
+                    //     a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
+                    // });
+                    // parents.truncate(8.max(len));
+                    // parents.shuffle(&mut rand::thread_rng());
+                    // let father = parents.pop().unwrap_or(Index(0));
+                    // let mother = parents.pop().unwrap_or(Index(0));
+                    // *boop = self
+                    //     .boop(father)
+                    //     .mate(self.boop(mother), 0.001, self.hidden_neurons);
+                    let mut parents = self
+                        .boops()
+                        .filter(|b| b.energy() > f32::from(u8::MAX))
+                        .collect::<Vec<_>>();
+                    parents.sort_unstable_by_key(|b| b.signature());
+                    parents.dedup_by_key(|b| b.signature());
+                    parents.sort_unstable_by(|a, b| {
+                        a.energy()
+                            .partial_cmp(&b.energy())
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    parents.truncate(parents.len().min(16));
+                    parents.shuffle(&mut rand::thread_rng());
+                    if let Some((father, mother)) = parents
+                        .pop()
+                        .and_then(|father| parents.pop().map(|mother| (father, mother)))
+                    {
+                        *boop = father.mate(&mother, 0.001, self.hidden_neurons);
+                    } else {
+                        *boop = Boop::new(self.synapses, self.hidden_neurons);
+                        boop.drain(100.0);
+                    }
+                }
+            }
         }
+
+        self.world.regenerate_food();
     }
 
     pub fn next_generation(&mut self) -> bool {
@@ -60,7 +109,7 @@ impl Simulation {
             ));
         }
 
-        self.world = World::new(self.size(), count, 4);
+        self.world = World::new(self.size(), count, 5);
         self.boops = spawn;
         true
     }

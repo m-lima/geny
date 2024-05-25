@@ -175,6 +175,7 @@ enum Input {
     // DirectionHorizontal,
     FoodDirection,
     FoodDistance,
+    Energy,
     Unit,
     Random,
 }
@@ -235,6 +236,9 @@ impl Input {
                     Stimulus::cap(*d / f32::from(simulation.size()))
                 })
             }
+            Self::Energy => {
+                Stimulus::cap(simulation.boop(index).energy() / (f32::from(u8::MAX) * 16.0))
+            }
             Self::Unit => Stimulus::from(true),
             Self::Random => Stimulus::cap(rand::random::<f32>()),
         }
@@ -267,13 +271,20 @@ impl Output {
     fn act(self, simulation: &mut Simulation, index: Index, stimulus: Stimulus) {
         match self {
             Self::TurnLeft => {
-                simulation.boop_mut(index).turn_left(stimulus.as_f32());
+                let boop = simulation.boop_mut(index);
+                boop.drain(stimulus.as_f32());
+                boop.turn_left(stimulus.as_f32() * stimulus.as_f32());
             }
             Self::TurnRight => {
-                simulation.boop_mut(index).turn_right(stimulus.as_f32());
+                let boop = simulation.boop_mut(index);
+                boop.drain(stimulus.as_f32());
+                boop.turn_right(stimulus.as_f32() * stimulus.as_f32());
             }
             Self::Advance => {
-                let direction = simulation.boop(index).direction();
+                let boop = simulation.boop_mut(index);
+                boop.drain(stimulus.as_f32() * stimulus.as_f32() * stimulus.as_f32());
+
+                let direction = boop.direction();
                 simulation
                     .world
                     .advance(index, stimulus.as_f32(), direction);

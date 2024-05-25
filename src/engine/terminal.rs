@@ -15,9 +15,9 @@ impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
                 render::<BORDER, CLEAR>(&simulation, gen, day, &mut buffer);
             }
             gen += 1;
-            if !simulation.next_generation() {
-                break;
-            }
+            // if !simulation.next_generation() {
+            //     break;
+            // }
         }
     }
 }

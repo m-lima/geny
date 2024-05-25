@@ -4,7 +4,7 @@ pub struct World {
     size: u8,
     sizef: f32,
     boops: Vec<Coordinate>,
-    food: Vec<Coordinate>,
+    food: Vec<(Coordinate, u8)>,
     // Walls
     // Foods
     // Lava
@@ -17,14 +17,8 @@ impl World {
         Self {
             size,
             sizef,
-            boops: build_vec!(
-                || Coordinate::new(rand::random::<f32>() * sizef, rand::random::<f32>() * sizef,),
-                count
-            ),
-            food: build_vec!(
-                || Coordinate::new(rand::random::<f32>() * sizef, rand::random::<f32>() * sizef,),
-                food_count
-            ),
+            boops: build_vec!(|| Coordinate::random(sizef), count),
+            food: build_vec!(|| (Coordinate::random(sizef), u8::MAX), food_count),
         }
     }
 
@@ -45,12 +39,40 @@ impl World {
 
     #[inline]
     pub fn fodder(&self) -> impl Iterator<Item = &Coordinate> {
-        self.food.iter()
+        self.food.iter().map(|(c, _)| c)
     }
 
-    pub fn on_food(&mut self, index: Index) -> bool {
-        for food in &self.food {
-            if food.distance(self.boop(index)) < 1. {
+    pub fn eat(&mut self, index: Index) -> Option<u8> {
+        let boop = self.boop(index);
+        let boop_x = boop.x();
+        for (food, energy) in &mut self.food {
+            if (food.x() - boop_x).abs() < 1.0 && food.distance(boop) < 1. {
+                if *energy <= 32 {
+                    *energy = 0;
+                    *food = Coordinate::random(self.sizef);
+                } else {
+                    *energy -= 32;
+                }
+                return Some(32);
+            }
+        }
+        None
+    }
+
+    pub fn regenerate_food(&mut self) {
+        for (food, energy) in &mut self.food {
+            if *energy == 0 {
+                *energy = u8::MAX;
+                *food = Coordinate::random(self.sizef);
+            }
+        }
+    }
+
+    pub fn on_food(&self, index: Index) -> bool {
+        let boop = self.boop(index);
+        let boop_x = boop.x();
+        for (food, _) in &self.food {
+            if (food.x() - boop_x).abs() < 1.0 && food.distance(boop) < 1. {
                 return true;
             }
         }
@@ -122,6 +144,10 @@ pub struct Coordinate(f32, f32);
 impl Coordinate {
     pub fn new(x: f32, y: f32) -> Self {
         Self(x, y)
+    }
+
+    fn random(size: f32) -> Self {
+        Self::new(rand::random::<f32>() * size, rand::random::<f32>() * size)
     }
 
     pub fn x(self) -> f32 {

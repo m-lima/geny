@@ -26,9 +26,9 @@ impl Engine for Quad {
                 }
 
                 gen += 1;
-                if !simulation.next_generation() {
-                    break;
-                }
+                // if !simulation.next_generation() {
+                //     break;
+                // }
             }
         });
     }

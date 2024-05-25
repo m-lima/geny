@@ -95,10 +95,7 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
                     output,
                     synapse,
                 } => {
-                    let hiddens: *mut Vec<Hidden> = &mut hiddens;
-                    Self::make_synapse(input, output, synapse, unsafe { &mut *hiddens }, unsafe {
-                        &mut *hiddens
-                    });
+                    Self::make_synapse_hidden(input, output, synapse, &mut hiddens);
                 }
                 Axon::FromHidden {
                     input,
@@ -151,6 +148,42 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
             let mut output = NOut::new(output);
             output.dentrites_mut().push(dentrite);
             outputs.push(output);
+        }
+    }
+
+    fn make_synapse_hidden<In: Copy + Eq, NIn: Source<In> + Sink<In>>(
+        input: In,
+        output: In,
+        synapse: Synapse,
+        inputs: &mut Vec<NIn>,
+    ) {
+        let input_index = if let Some(idx) = inputs
+            .iter()
+            .enumerate()
+            .find(|(_, i)| i.index() == input)
+            .map(|(i, _)| i)
+        {
+            idx
+        } else {
+            inputs.push(NIn::new(input));
+            inputs.len() - 1
+        };
+
+        let dentrite = Dentrite {
+            neuron: Ref {
+                hidden: NIn::hidden(),
+                index: input_index,
+            },
+            synapse,
+        };
+
+        if let Some(output) = inputs.iter_mut().find(|i| i.index() == output) {
+            // TODO: Can we precalculate what these two synapses would do to an input signal?
+            output.dentrites_mut().push(dentrite);
+        } else {
+            let mut output = NIn::new(output);
+            output.dentrites_mut().push(dentrite);
+            inputs.push(output);
         }
     }
 

@@ -1,4 +1,4 @@
-#![deny(warnings, clippy::pedantic, rust_2018_idioms, rust_2021_compatibility)]
+// #![deny(warnings, clippy::pedantic, rust_2018_idioms, rust_2021_compatibility)]
 
 macro_rules! build_vec {
     ($builder:expr, $size:expr) => {{
