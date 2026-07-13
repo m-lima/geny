@@ -13,7 +13,7 @@ impl Quad {
 impl Engine for Quad {
     fn start(self, mut simulation: Simulation, days: usize) {
         macroquad::Window::from_config(self.0, async move {
-            let mut gen = 0_usize;
+            let mut generation = 0_usize;
             loop {
                 for day in 0..days {
                     if macroquad::input::is_key_down(macroquad::input::KeyCode::Escape) {
@@ -21,11 +21,11 @@ impl Engine for Quad {
                     }
 
                     simulation.step();
-                    render(&simulation, gen, day);
+                    render(&simulation, generation, day);
                     macroquad::window::next_frame().await;
                 }
 
-                gen += 1;
+                generation += 1;
                 if !simulation.next_generation() {
                     break;
                 }
@@ -34,7 +34,7 @@ impl Engine for Quad {
     }
 }
 
-fn render(simulation: &Simulation, gen: usize, day: usize) {
+fn render(simulation: &Simulation, generation: usize, day: usize) {
     macroquad::window::clear_background(macroquad::color::Color::from_rgba(33, 33, 33, 255));
 
     let width = macroquad::window::screen_width();
@@ -49,7 +49,7 @@ fn render(simulation: &Simulation, gen: usize, day: usize) {
         macroquad::color::Color::from_rgba(22, 22, 22, 255),
     );
     macroquad::text::draw_text(
-        &format!("Generation: {gen} Day: {day}"),
+        &format!("Generation: {generation} Day: {day}"),
         2.,
         14.,
         24.,

@@ -4,7 +4,7 @@ pub struct Signal(f32);
 
 impl Signal {
     pub fn cap(value: f32) -> Self {
-        Self(value.min(1.).max(0.))
+        Self(value.clamp(0., 1.))
     }
 
     #[inline]
@@ -15,11 +15,7 @@ impl Signal {
 
 impl From<bool> for Signal {
     fn from(value: bool) -> Self {
-        if value {
-            Self(1.)
-        } else {
-            Self(0.)
-        }
+        if value { Self(1.) } else { Self(0.) }
     }
 }
 
@@ -35,7 +31,7 @@ pub struct Amplifier(f32);
 
 impl Amplifier {
     pub fn new(value: f32) -> Self {
-        Self(value.min(4.).max(-4.))
+        Self(value.clamp(-4., 4.))
     }
 }
 

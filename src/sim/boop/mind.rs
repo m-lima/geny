@@ -295,7 +295,7 @@ mod test {
                 let (conn_type, input, output) = Gene::dissect(gene.0);
 
                 if i == 0 {
-                    assert!(conn_type == 0);
+                    assert_eq!(conn_type, 0);
                 }
 
                 match conn_type {
@@ -329,7 +329,7 @@ mod test {
         for _ in 0..10 {
             reference = gene.0;
             gene.mutate(8);
-            assert!((reference.max(gene.0) - reference.min(gene.0)) % 2 == 0);
+            assert_eq!((reference.max(gene.0) - reference.min(gene.0)) % 2, 0);
         }
     }
 }

@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
         .ok_or(anyhow::anyhow!("No hidden neuron count provided"))?
         .parse()?;
 
-    let terminal = args.next().map(|s| s.trim() == "t").is_some();
+    let terminal = args.next().is_some_and(|s| s.trim() == "t");
 
     let simulation = sim::Simulation::new(size, beings, synapses, hidden_neurons);
 

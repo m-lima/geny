@@ -95,7 +95,7 @@ impl<I: Copy + Eq, O: Copy + Eq, const H: u8> Brain<I, O, H> {
                     output,
                     synapse,
                 } => {
-                    let hiddens: *mut Vec<Hidden> = &mut hiddens;
+                    let hiddens: *mut Vec<Hidden> = &raw mut hiddens;
                     Self::make_synapse(input, output, synapse, unsafe { &mut *hiddens }, unsafe {
                         &mut *hiddens
                     });

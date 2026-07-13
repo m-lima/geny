@@ -5,16 +5,16 @@ pub struct Terminal<const BORDER: bool, const CLEAR: bool>;
 
 impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
     fn start(self, mut simulation: Simulation, days: usize) {
-        let mut gen = 0_usize;
+        let mut generation = 0_usize;
 
         let mut buffer = vec![vec![None; simulation.size() as usize]; simulation.size() as usize];
 
         loop {
             for day in 0..days {
                 simulation.step();
-                render::<BORDER, CLEAR>(&simulation, gen, day, &mut buffer);
+                render::<BORDER, CLEAR>(&simulation, generation, day, &mut buffer);
             }
-            gen += 1;
+            generation += 1;
             if !simulation.next_generation() {
                 break;
             }
@@ -24,7 +24,7 @@ impl<const BORDER: bool, const CLEAR: bool> Engine for Terminal<BORDER, CLEAR> {
 
 fn render<const BORDER: bool, const CLEAR: bool>(
     simulation: &Simulation,
-    gen: usize,
+    generation: usize,
     day: usize,
     buffer: &mut Vec<Vec<Option<(char, u32)>>>,
 ) {
@@ -34,9 +34,15 @@ fn render<const BORDER: bool, const CLEAR: bool>(
 
     if CLEAR {
         let height = simulation.size() + 1 + if BORDER { 2 } else { 0 };
-        let _ = writeln!(stdout, "[{height}AGeneration: [37m{gen}[m Day: [37m{day}[m");
+        let _ = writeln!(
+            stdout,
+            "[{height}AGeneration: [37m{generation}[m Day: [37m{day}[m"
+        );
     } else {
-        let _ = writeln!(stdout, "Generation: [37m{gen}[m Day: [37m{day}[m");
+        let _ = writeln!(
+            stdout,
+            "Generation: [37m{generation}[m Day: [37m{day}[m"
+        );
     }
 
     if BORDER {
